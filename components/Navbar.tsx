@@ -13,6 +13,27 @@ const NAV = [
   { href: "/kontakt", label: "Kontakt" },
 ];
 
+const INSTAGRAM_URL = "https://www.instagram.com/vibepadeltour/";
+
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -67,9 +88,19 @@ export function Navbar() {
               </Link>
             );
           })}
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Vibe Padel Tour na Instagramu"
+            title="Prati rezultate na Instagramu"
+            className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/5 hover:text-gold"
+          >
+            <InstagramIcon className="h-5 w-5" />
+          </a>
           <Link
             href="/kontakt"
-            className="ml-2 rounded-full bg-gold px-5 py-2 text-sm font-semibold text-ink shadow-[var(--shadow-gold)] transition hover:bg-gold-bright"
+            className="ml-1 rounded-full bg-gold px-5 py-2 text-sm font-semibold text-ink shadow-[var(--shadow-gold)] transition hover:bg-gold-bright"
           >
             Prijavi se
           </Link>
@@ -113,6 +144,15 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
+            <a
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-white/80 hover:bg-white/5 hover:text-white"
+            >
+              <InstagramIcon className="h-5 w-5" />
+              Instagram
+            </a>
             <Link
               href="/kontakt"
               className="mt-2 rounded-lg bg-gold px-3 py-3 text-center text-base font-semibold text-ink"
