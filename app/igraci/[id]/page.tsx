@@ -5,6 +5,7 @@ import { Avatar } from "@/components/Avatar";
 import { Badge } from "@/components/ui";
 import {
   getPlayer,
+  getPlayers,
   playerName,
   getRankForPlayer,
   getStandingsForPlayer,
@@ -13,7 +14,11 @@ import {
   getGroups,
 } from "@/lib/data";
 
-export const dynamic = "force-dynamic";
+// Statički export: generiši stranu za svakog igrača u build-u.
+export async function generateStaticParams() {
+  const players = await getPlayers();
+  return players.map((p) => ({ id: String(p.id) }));
+}
 
 export async function generateMetadata({
   params,

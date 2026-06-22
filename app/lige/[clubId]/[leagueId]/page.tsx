@@ -6,6 +6,7 @@ import { LeagueView } from "@/components/LeagueView";
 import {
   getClub,
   getLeague,
+  getLeagues,
   getGroups,
   getStandingsForGroup,
   getRounds,
@@ -13,7 +14,11 @@ import {
 
 type Params = { clubId: string; leagueId: string };
 
-export const dynamic = "force-dynamic";
+// Statički export: generiši stranu za svaku ligu (par klub/liga) u build-u.
+export async function generateStaticParams() {
+  const leagues = await getLeagues();
+  return leagues.map((l) => ({ clubId: String(l.clubId), leagueId: String(l.id) }));
+}
 
 export async function generateMetadata({
   params,

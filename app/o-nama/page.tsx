@@ -22,7 +22,6 @@ const VALUES = [
   },
 ];
 
-export const dynamic = "force-dynamic";
 
 export default async function ONamaPage() {
   const stats = await getStats();

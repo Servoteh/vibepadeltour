@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   description: "Sve lige i sezone u okviru Vibe Padel Tour-a — grupe, plasmani i raspored.",
 };
 
-export const dynamic = "force-dynamic";
 
 export default async function LigePage() {
   const clubs = await getClubs();
