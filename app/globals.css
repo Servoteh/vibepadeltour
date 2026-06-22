@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/*
+  Vibe Padel Tour — dizajn sistem
+  Premium: svetlo telo + tamne crno/zlatne sekcije. Zlato = luksuzni akcenat (iz logoa),
+  morsko-plava = sportski/Adriatic akcenat, lime = pop (padel loptica).
+*/
+
+@theme {
+  /* Površine */
+  --color-cream: #faf8f3;
+  --color-cream-2: #f3efe6;
+  --color-paper: #ffffff;
+
+  /* Tamno (hero/footer) — duboko ugljeno sa toplim tonom */
+  --color-ink: #0b0b0d;
+  --color-ink-2: #131318;
+  --color-ink-3: #1d1d24;
+
+  /* Zlato — brend akcenat */
+  --color-gold: #e6b84e;
+  --color-gold-bright: #f4cf6a;
+  --color-gold-deep: #b8893a;
+
+  /* Sekundarni akcenti */
+  --color-sea: #0e7ca8;
+  --color-sea-deep: #0a5f82;
+  --color-lime: #c8f02e;
+
+  /* Tekst */
+  --color-navy: #14171f;
+  --color-muted: #5b6170;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), var(--font-geist-sans), sans-serif;
+
+  --radius-card: 1.25rem;
+
+  --shadow-soft: 0 1px 2px rgba(20, 23, 31, 0.04), 0 8px 24px rgba(20, 23, 31, 0.06);
+  --shadow-gold: 0 8px 30px rgba(230, 184, 78, 0.25);
+}
+
+:root {
+  --background: var(--color-cream);
+  --foreground: var(--color-navy);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Display tipografija */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Zlatni gradijent tekst */
+.text-gold-gradient {
+  background: linear-gradient(180deg, #f7d885 0%, #e6b84e 45%, #b8893a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Suptilna mrežica/teren pozadina za tamne sekcije */
+.court-grid {
+  background-image:
+    linear-gradient(rgba(230, 184, 78, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(230, 184, 78, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.gold-hairline {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(230, 184, 78, 0.6),
+    transparent
+  );
+}
+
+/* Animacija ulaska */
+@keyframes vpt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: vpt-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-ink);
+}

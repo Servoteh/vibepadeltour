@@ -1,0 +1,266 @@
+[
+  {
+    "id": 18,
+    "name": "A - (*GOLD*)",
+    "clubId": 1,
+    "leagueId": 4
+  },
+  {
+    "id": 19,
+    "name": "A - (*SILVER*)",
+    "clubId": 1,
+    "leagueId": 4
+  },
+  {
+    "id": 20,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 4
+  },
+  {
+    "id": 21,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 4
+  },
+  {
+    "id": 30,
+    "name": "A-(*GOLD*)",
+    "clubId": 1,
+    "leagueId": 7
+  },
+  {
+    "id": 31,
+    "name": "A-(*SILVER*)",
+    "clubId": 1,
+    "leagueId": 7
+  },
+  {
+    "id": 32,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 7
+  },
+  {
+    "id": 33,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 7
+  },
+  {
+    "id": 42,
+    "name": "A-(*GOLD*)",
+    "clubId": 1,
+    "leagueId": 10
+  },
+  {
+    "id": 43,
+    "name": "A-(*SILVER*)",
+    "clubId": 1,
+    "leagueId": 10
+  },
+  {
+    "id": 44,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 10
+  },
+  {
+    "id": 16,
+    "name": "A - (PLAY-IN)",
+    "clubId": 1,
+    "leagueId": 1
+  },
+  {
+    "id": 15,
+    "name": "A - (PLAY-OUT)",
+    "clubId": 1,
+    "leagueId": 1
+  },
+  {
+    "id": 3,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 1
+  },
+  {
+    "id": 4,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 1
+  },
+  {
+    "id": 22,
+    "name": "A - (*GOLD*)",
+    "clubId": 1,
+    "leagueId": 5
+  },
+  {
+    "id": 23,
+    "name": "A - (*SILVER*)",
+    "clubId": 1,
+    "leagueId": 5
+  },
+  {
+    "id": 24,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 5
+  },
+  {
+    "id": 25,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 5
+  },
+  {
+    "id": 34,
+    "name": "A-(*GOLD*)",
+    "clubId": 1,
+    "leagueId": 8
+  },
+  {
+    "id": 35,
+    "name": "A-(*SILVER*)",
+    "clubId": 1,
+    "leagueId": 8
+  },
+  {
+    "id": 36,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 8
+  },
+  {
+    "id": 37,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 8
+  },
+  {
+    "id": 45,
+    "name": "A-(*GOLD*)",
+    "clubId": 1,
+    "leagueId": 11
+  },
+  {
+    "id": 46,
+    "name": "A-(*SILVER*)",
+    "clubId": 1,
+    "leagueId": 11
+  },
+  {
+    "id": 47,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 11
+  },
+  {
+    "id": 13,
+    "name": "A - (PLAY-IN)",
+    "clubId": 1,
+    "leagueId": 2
+  },
+  {
+    "id": 14,
+    "name": "A - (PLAY-OUT)",
+    "clubId": 1,
+    "leagueId": 2
+  },
+  {
+    "id": 7,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 2
+  },
+  {
+    "id": 8,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 2
+  },
+  {
+    "id": 26,
+    "name": "A ",
+    "clubId": 1,
+    "leagueId": 6
+  },
+  {
+    "id": 28,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 6
+  },
+  {
+    "id": 29,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 6
+  },
+  {
+    "id": 38,
+    "name": "A-(*ISTOK*)",
+    "clubId": 1,
+    "leagueId": 9
+  },
+  {
+    "id": 39,
+    "name": "A-(*ZAPAD*)",
+    "clubId": 1,
+    "leagueId": 9
+  },
+  {
+    "id": 40,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 9
+  },
+  {
+    "id": 41,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 9
+  },
+  {
+    "id": 48,
+    "name": "A",
+    "clubId": 1,
+    "leagueId": 12
+  },
+  {
+    "id": 49,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 12
+  },
+  {
+    "id": 50,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 12
+  },
+  {
+    "id": 9,
+    "name": "A",
+    "clubId": 1,
+    "leagueId": 3
+  },
+  {
+    "id": 10,
+    "name": "B",
+    "clubId": 1,
+    "leagueId": 3
+  },
+  {
+    "id": 11,
+    "name": "C",
+    "clubId": 1,
+    "leagueId": 3
+  },
+  {
+    "id": 12,
+    "name": "D",
+    "clubId": 1,
+    "leagueId": 3
+  }
+]
