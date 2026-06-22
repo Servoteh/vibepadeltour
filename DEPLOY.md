@@ -9,18 +9,29 @@ build i deploy.
 
 ## Podešavanja Worker build-a (Cloudflare dashboard)
 
-- **Build command:** `npx opennextjs-cloudflare build`
-- **Deploy command:** `npx wrangler deploy`
-- **Root directory:** `/`
-- (preporučeno) Environment var `NODE_VERSION` = `22`
+> **Ako deploy puca sa „Cannot find `.open-next/worker.js`”** — Workers Build još koristi
+> stari static-export setup. U Cloudflare dashboardu (Worker → Settings → Builds) promeni:
+
+| Polje | Vrednost |
+|-------|----------|
+| **Build command** | `npx opennextjs-cloudflare build` |
+| **Deploy command** | `npx wrangler deploy` |
+| **Root directory** | `/` |
+| **NODE_VERSION** (env) | `22` (preporučeno) |
+
+`npm run build` samo pravi Next build — **ne** generiše `.open-next/worker.js`. Za deploy
+mora OpenNext korak (`build:cf` ili gornja komanda).
 
 > `wrangler.jsonc` ima `main: .open-next/worker.js` i `assets.directory: .open-next/assets`,
 > uz `nodejs_compat`. Konfiguracija adaptera je u [`open-next.config.ts`](./open-next.config.ts).
 
-## Tajne i env (KRITIČNO)
+Workers Builds radi na Linux-u (OpenNext build tamo radi; lokalni Windows build je ranije
+pravio pokvaren worker — za lokalni preview koristi `npm run preview` ili WSL).
+
+## Tajne i env (KRITIČNO — pre prvog rada admina)
 
 Javne vrednosti su u `wrangler.jsonc` → `vars` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-Tajne se NE drže u repo-u — dodaju se kao Worker secrets:
+Tajne se NE drže u repo-u — dodaju se kao Worker secrets (jednokratno, interaktivno):
 
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # service_role ključ (admin upisi)
@@ -46,7 +57,9 @@ Seed postojećih podataka (jednokratno): `node --env-file=.env.local scripts/see
 npm install
 npm run dev        # http://localhost:3000 (Next dev, čita .env.local)
 npm run build      # next build (provera tipova/build-a)
-npm run preview    # opennextjs-cloudflare build + wrangler dev (lokalni Worker)
+npm run build:cf   # opennextjs-cloudflare build → .open-next/
+npm run preview    # build:cf + wrangler dev (lokalni Worker)
+npm run deploy     # build:cf + wrangler deploy
 ```
 
 `.env.local` mora imati: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
