@@ -33,6 +33,10 @@ function mapPlayer(r: Row): Player {
     firstName: clean(r.first_name as string),
     lastName: clean(r.last_name as string),
     dob: (r.dob as string) ?? "",
+    gender: (r.gender as string) ?? "",
+    photoUrl: (r.photo_url as string) ?? "",
+    email: (r.email as string) ?? "",
+    phone: (r.phone as string) ?? "",
   };
 }
 function mapTeam(r: Row): Team {

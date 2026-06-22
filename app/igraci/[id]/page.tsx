@@ -71,7 +71,18 @@ export default async function PlayerProfile({
             ← Svi igrači
           </Link>
           <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-center">
-            <Avatar name={name} size={92} className="ring-2 ring-gold/40" />
+            {player.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={player.photoUrl}
+                alt={name}
+                width={92}
+                height={92}
+                className="h-[92px] w-[92px] rounded-full object-cover ring-2 ring-gold/40"
+              />
+            ) : (
+              <Avatar name={name} size={92} className="ring-2 ring-gold/40" />
+            )}
             <div>
               <h1 className="font-display text-3xl font-bold sm:text-4xl">{name}</h1>
               <div className="mt-3 flex flex-wrap gap-3">

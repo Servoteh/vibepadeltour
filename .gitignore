@@ -42,3 +42,8 @@ next-env.d.ts
 
 # build izlaz (static export)
 /out/
+
+# OpenNext / Cloudflare
+/.open-next/
+/.wrangler/
+.dev.vars

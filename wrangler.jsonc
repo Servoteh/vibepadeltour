@@ -1,12 +1,19 @@
 {
-  // Cloudflare Worker sa STATIČKIM fajlovima (Faza 1 = static export).
-  // `npm run build` generiše ./out, a `wrangler deploy` ga uploaduje kao statički sajt.
-  // Bez OpenNext-a (njega uvodimo u Fazi 2 kad dodamo server/admin/Supabase).
+  // Cloudflare Worker — Next.js SSR preko OpenNext adaptera (Faza 2).
+  // Build: `npx opennextjs-cloudflare build` (pravi .open-next/), deploy: `wrangler deploy`.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vibepadeltour",
+  "main": ".open-next/worker.js",
   "compatibility_date": "2026-06-22",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "./out",
-    "not_found_handling": "404-page"
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Javne vrednosti (anon ključ je namenjen javnoj upotrebi, štićen RLS-om).
+  // SUPABASE_SERVICE_ROLE_KEY se NE drži ovde — dodaje se kao Worker secret.
+  "vars": {
+    "SUPABASE_URL": "https://rviicmdaxfwsfsdlcsso.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2aWljbWRheGZ3c2ZzZGxjc3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNjc1NTksImV4cCI6MjA5Nzc0MzU1OX0.ORHP7aAuo_wsHwaXXIfXl2AD-BkS3RaspKrQW-x7tn0"
   }
 }

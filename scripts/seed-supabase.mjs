@@ -5,10 +5,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!URL || !KEY) {
-  console.error("Nedostaju NEXT_PUBLIC_SUPABASE_URL ili SUPABASE_SERVICE_ROLE_KEY (.env.local).");
+  console.error("Nedostaju SUPABASE_URL ili SUPABASE_SERVICE_ROLE_KEY (.env.local).");
   process.exit(1);
 }
 

@@ -5,6 +5,11 @@ export interface Player {
   firstName: string;
   lastName: string;
   dob: string;
+  gender?: string; // 'm' | 'f' | ''
+  photoUrl?: string;
+  // Lični kontakt — samo za admina, ne prikazuje se javno
+  email?: string;
+  phone?: string;
 }
 
 export interface Team {
