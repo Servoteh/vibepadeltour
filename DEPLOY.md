@@ -1,23 +1,23 @@
-# Deploy — Cloudflare Pages
+# Deploy — Cloudflare Workers (static assets)
 
-Sajt se automatski deployuje na **Cloudflare Pages** iz ovog GitHub repo-a.
-Svaki `git push` na granu `main` pokreće novi build i deploy.
+Sajt se automatski deployuje na **Cloudflare Workers** iz ovog GitHub repo-a preko
+**Workers Builds**. Svaki `git push` na granu `main` pokreće novi build i deploy.
 
-## Jednokratno povezivanje (Cloudflare dashboard)
+Faza 1 je static export → `npm run build` generiše `./out`, a `npx wrangler deploy`
+uploaduje te statičke fajlove (konfiguracija u [`wrangler.jsonc`](./wrangler.jsonc)).
 
-1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Pages** →
-   **Connect to Git**.
-2. Izaberi repo **Servoteh/vibepadeltour**, grana **main**.
-3. Build podešavanja:
-   - **Framework preset:** `Next.js (Static HTML Export)`
-   - **Build command:** `npx next build`
-   - **Build output directory:** `out`
-4. **Environment variables** (Settings → Environment variables):
-   - `NODE_VERSION` = `20` (ili `22`)
-5. **Save and Deploy.**
+## Podešavanja Worker build-a (Cloudflare dashboard)
 
-Nakon prvog deploya, svaki push na `main` automatski radi novi build.
-Custom domen (`vibepadeltour.com`) se dodaje u **Pages → Custom domains**.
+- **Build command:** `npm run build`
+- **Deploy command:** `npx wrangler deploy`
+- **Root directory:** `/`
+- (preporučeno) Environment var `NODE_VERSION` = `22`
+
+> `wrangler.jsonc` ima `assets.directory: ./out`, pa `wrangler deploy` uploaduje
+> statički sajt bez OpenNext-a. (Bez tog fajla wrangler pokuša OpenNext autoconfig koji
+> očekuje server build i puca na `pages-manifest.json`.)
+
+Custom domen (`vibepadeltour.com`) se dodaje u Worker → Settings → Domains & Routes.
 
 ## Lokalni razvoj
 
