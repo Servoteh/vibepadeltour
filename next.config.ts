@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Statički export: strane se generišu u build-u (čitaju iz Supabase-a) i deploy-uju
-  // kao statički fajlovi na Cloudflare. Admin izmene se objave novim `npm run deploy`.
-  output: "export",
+  // Faza 2: SSR preko Cloudflare (OpenNext adapter). Strane su force-dynamic i čitaju
+  // iz Supabase-a na svaki zahtev, pa admin izmene (i unos rezultata) vide se odmah.
+  // (Bez `output: "export"` — server actions i SSR ne rade sa statičkim export-om.)
   images: {
     unoptimized: true,
   },

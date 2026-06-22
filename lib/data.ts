@@ -27,6 +27,10 @@ const byName = (a: { firstName: string; lastName: string }, b: typeof a) =>
 type Row = Record<string, unknown>;
 const sb = () => supabasePublic();
 
+// Javni upiti — bez email/phone (revoke na anon/authenticated u 02_players_extra.sql).
+const PLAYER_PUBLIC_COLUMNS =
+  "id, first_name, last_name, dob, gender, photo_url";
+
 function mapPlayer(r: Row): Player {
   return {
     id: r.id as number,
@@ -113,11 +117,20 @@ async function fetchAll<T>(table: string, mapper: (r: Row) => T): Promise<T[]> {
 
 // ——— Igrači ———
 export async function getPlayers(): Promise<Player[]> {
-  const rows = await fetchAll("players", mapPlayer);
+  const { data, error } = await sb()
+    .from("players")
+    .select(PLAYER_PUBLIC_COLUMNS)
+    .limit(2000);
+  if (error) throw new Error(`players: ${error.message}`);
+  const rows = (data ?? []).map(mapPlayer);
   return rows.sort(byName);
 }
 export async function getPlayer(id: number): Promise<Player | undefined> {
-  const { data, error } = await sb().from("players").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await sb()
+    .from("players")
+    .select(PLAYER_PUBLIC_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw new Error(`player ${id}: ${error.message}`);
   return data ? mapPlayer(data) : undefined;
 }

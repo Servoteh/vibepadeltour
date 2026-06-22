@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   description: "Ko stoji iza Vibe Padel Tour-a — premium padel zajednice u regionu.",
 };
 
+export const dynamic = "force-dynamic";
+
 const VALUES = [
   {
     title: "Premium doživljaj",

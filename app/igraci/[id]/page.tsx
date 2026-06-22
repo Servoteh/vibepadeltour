@@ -5,7 +5,6 @@ import { Avatar } from "@/components/Avatar";
 import { Badge } from "@/components/ui";
 import {
   getPlayer,
-  getPlayers,
   playerName,
   getRankForPlayer,
   getStandingsForPlayer,
@@ -14,11 +13,8 @@ import {
   getGroups,
 } from "@/lib/data";
 
-// Statički export: generiši stranu za svakog igrača u build-u.
-export async function generateStaticParams() {
-  const players = await getPlayers();
-  return players.map((p) => ({ id: String(p.id) }));
-}
+// SSR: čita iz baze na svaki zahtev, pa se admin izmene vide odmah.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

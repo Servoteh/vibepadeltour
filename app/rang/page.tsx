@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description: "Zvanična rang lista igrača Vibe Padel Tour-a.",
 };
 
+export const dynamic = "force-dynamic";
 
 export default async function RangPage() {
   const rows: RankRow[] = (await getRanking()).map((r) => ({

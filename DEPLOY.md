@@ -1,41 +1,67 @@
-# Deploy — Cloudflare Workers (static assets)
+# Deploy — Cloudflare Workers (SSR / OpenNext)
 
-Sajt se automatski deployuje na **Cloudflare Workers** iz ovog GitHub repo-a preko
-**Workers Builds**. Svaki `git push` na granu `main` pokreće novi build i deploy.
+Od **Faze 2** sajt je server-renderovan (čita iz Supabase-a na svaki zahtev, ima admin
+panel i unos rezultata), pa se deployuje preko **OpenNext Cloudflare adaptera**, a NE više
+kao static export.
 
-Faza 1 je static export → `npm run build` generiše `./out`, a `npx wrangler deploy`
-uploaduje te statičke fajlove (konfiguracija u [`wrangler.jsonc`](./wrangler.jsonc)).
+Deploy ide iz GitHub repo-a preko **Workers Builds** — svaki `git push` na `main` pokreće
+build i deploy.
 
 ## Podešavanja Worker build-a (Cloudflare dashboard)
 
-- **Build command:** `npm run build`
+- **Build command:** `npx opennextjs-cloudflare build`
 - **Deploy command:** `npx wrangler deploy`
 - **Root directory:** `/`
 - (preporučeno) Environment var `NODE_VERSION` = `22`
 
-> `wrangler.jsonc` ima `assets.directory: ./out`, pa `wrangler deploy` uploaduje
-> statički sajt bez OpenNext-a. (Bez tog fajla wrangler pokuša OpenNext autoconfig koji
-> očekuje server build i puca na `pages-manifest.json`.)
+> `wrangler.jsonc` ima `main: .open-next/worker.js` i `assets.directory: .open-next/assets`,
+> uz `nodejs_compat`. Konfiguracija adaptera je u [`open-next.config.ts`](./open-next.config.ts).
 
-Custom domen (`vibepadeltour.com`) se dodaje u Worker → Settings → Domains & Routes.
+## Tajne i env (KRITIČNO)
+
+Javne vrednosti su u `wrangler.jsonc` → `vars` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+Tajne se NE drže u repo-u — dodaju se kao Worker secrets:
+
+```bash
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # service_role ključ (admin upisi)
+npx wrangler secret put ADMIN_PASSWORD              # lozinka za /admin login
+npx wrangler secret put SESSION_SECRET              # tajni ključ za potpis session cookie-ja
+```
+
+`SESSION_SECRET` generiši nasumično, npr: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+
+## Migracije baze (pokreni ručno u Supabase → SQL Editor)
+
+Redom, idempotentno:
+
+1. [`supabase/schema.sql`](./supabase/schema.sql) — tabele + RLS (javno čitanje)
+2. [`supabase/02_players_extra.sql`](./supabase/02_players_extra.sql) — kontakt/pol/slika igrača, storage bucket, revoke email/phone od anon
+3. [`supabase/03_matches.sql`](./supabase/03_matches.sql) — tabela mečeva + RPC `record_match` / `delete_match`
+
+Seed postojećih podataka (jednokratno): `node --env-file=.env.local scripts/seed-supabase.mjs`.
 
 ## Lokalni razvoj
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # static export → ./out
+npm run dev        # http://localhost:3000 (Next dev, čita .env.local)
+npm run build      # next build (provera tipova/build-a)
+npm run preview    # opennextjs-cloudflare build + wrangler dev (lokalni Worker)
 ```
 
-## Osvežavanje podataka (jednokratni snapshot sa starog API-ja)
+`.env.local` mora imati: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`ADMIN_PASSWORD`, `SESSION_SECRET`.
+
+## Admin panel
+
+- `/admin/login` — prijava deljenom lozinkom (`ADMIN_PASSWORD`).
+- `/admin/rezultati` — unos rezultata (liga → grupa → ekipe → setovi/predaja). Bodovi i
+  tabela se ažuriraju automatski preko RPC-a. Bodovanje: pobeda 2, poraz 1; predaja 6:0 6:0
+  (pobednik 2, predao 0, bez gem/set količnika). Mečevi se mogu poništiti (vraća tabelu).
+- `/admin/igraci` — izmena/dodavanje igrača (kontakt, pol, fotografija).
+
+## Osvežavanje sa starog API-ja (opciono, jednokratni snapshot)
 
 ```bash
-node scripts/import.mjs   # upisuje data/*.json
+node scripts/import.mjs    # upisuje data/*.json
 ```
-
-## Napomena (Faza 2)
-
-Trenutni build je **static export** (`output: 'export'` u `next.config.ts`) jer je
-Faza 1 potpuno statična. Kada dodamo admin panel + Supabase (Faza 2), prelazimo na
-Cloudflare Next adapter (`@opennextjs/cloudflare`) za SSR/API rute i podešavamo build
-komandu na `npx opennextjs-cloudflare build`.

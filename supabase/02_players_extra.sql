@@ -10,3 +10,12 @@ alter table players add column if not exists photo_url text;
 insert into storage.buckets (id, name, public)
 values ('player-photos', 'player-photos', true)
 on conflict (id) do nothing;
+
+drop policy if exists "public_read_player_photos" on storage.objects;
+create policy "public_read_player_photos"
+  on storage.objects for select
+  using (bucket_id = 'player-photos');
+
+-- Kontakt podaci: samo service_role (admin), ne anon/authenticated
+revoke select (email, phone) on public.players from anon, authenticated;
+grant select (email, phone) on public.players to service_role;

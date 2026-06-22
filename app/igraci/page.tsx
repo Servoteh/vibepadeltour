@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   description: "Baza igrača Vibe Padel Tour-a — pretraži igrače i pogledaj njihove bodove.",
 };
 
+export const dynamic = "force-dynamic";
 
 export default async function IgraciPage() {
   const [players, ranking] = await Promise.all([getPlayers(), getRanking()]);
