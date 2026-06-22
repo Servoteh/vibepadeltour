@@ -4,19 +4,16 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { Badge } from "@/components/ui";
 import {
-  getPlayers,
   getPlayer,
   playerName,
   getRankForPlayer,
   getStandingsForPlayer,
   getTeamsForPlayer,
-  getLeague,
+  getLeagues,
   getGroups,
 } from "@/lib/data";
 
-export function generateStaticParams() {
-  return getPlayers().map((p) => ({ id: String(p.id) }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -24,7 +21,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const p = getPlayer(Number(id));
+  const p = await getPlayer(Number(id));
   return { title: p ? playerName(p) : "Igrač" };
 }
 
@@ -35,24 +32,36 @@ export default async function PlayerProfile({
 }) {
   const { id } = await params;
   const pid = Number(id);
-  const player = getPlayer(pid);
+  const [player, rankInfo, appearances, teams, allLeagues] = await Promise.all([
+    getPlayer(pid),
+    getRankForPlayer(pid),
+    getStandingsForPlayer(pid),
+    getTeamsForPlayer(pid),
+    getLeagues(),
+  ]);
   if (!player) notFound();
 
   const name = playerName(player);
-  const rankInfo = getRankForPlayer(pid);
-  const appearances = getStandingsForPlayer(pid);
-  const teams = getTeamsForPlayer(pid);
 
   // Agregati iz nastupa
   const totalPlayed = appearances.reduce((a, s) => a + s.matchesPlayed, 0);
   const totalWon = appearances.reduce((a, s) => a + s.matchesWon, 0);
   const winPct = totalPlayed > 0 ? Math.round((totalWon / totalPlayed) * 100) : 0;
 
-  const groupsLookup = (clubId: number, leagueId: number, groupId: number) => {
-    const g = getGroups(clubId, leagueId).find((x) => x.id === groupId);
-    const league = getLeague(clubId, leagueId);
-    return { groupName: g?.name, league };
-  };
+  // Mape liga i grupa za nastupe (mali broj upita)
+  const leagueMap = new Map(allLeagues.map((l) => [l.id, l]));
+  const uniqueLeagues = [...new Set(appearances.map((s) => `${s.clubId}:${s.leagueId}`))];
+  const groupLists = await Promise.all(
+    uniqueLeagues.map((k) => {
+      const [c, l] = k.split(":").map(Number);
+      return getGroups(c, l);
+    })
+  );
+  const groupMap = new Map(groupLists.flat().map((g) => [g.id, g]));
+  const groupsLookup = (_clubId: number, leagueId: number, groupId: number) => ({
+    groupName: groupMap.get(groupId)?.name,
+    league: leagueMap.get(leagueId),
+  });
 
   return (
     <>

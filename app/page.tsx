@@ -13,17 +13,27 @@ import {
   getStandings,
 } from "@/lib/data";
 
-export default function Home() {
-  const stats = getStats();
-  const topRanking = getRanking().slice(0, 10);
-  const clubs = getClubs();
+export const dynamic = "force-dynamic";
 
-  // Istaknute lige: BPK (klub 1), aktivne/poslednje
-  const featuredLeagues = getLeaguesForClub(1).slice(0, 3).map((l) => {
-    const groups = getGroups(l.clubId, l.id);
-    const teams = getStandings(l.clubId, l.id).length;
-    return { league: l, groups: groups.length, teams };
-  });
+export default async function Home() {
+  const [stats, ranking, clubs, bpkLeagues] = await Promise.all([
+    getStats(),
+    getRanking(),
+    getClubs(),
+    getLeaguesForClub(1),
+  ]);
+  const topRanking = ranking.slice(0, 10);
+
+  // Istaknute lige: BPK (klub 1), najnovije sezone
+  const featuredLeagues = await Promise.all(
+    bpkLeagues.slice(0, 3).map(async (l) => {
+      const [groups, standings] = await Promise.all([
+        getGroups(l.clubId, l.id),
+        getStandings(l.clubId, l.id),
+      ]);
+      return { league: l, groups: groups.length, teams: standings.length };
+    })
+  );
 
   return (
     <>

@@ -8,9 +8,11 @@ export const metadata: Metadata = {
   description: "Baza igrača Vibe Padel Tour-a — pretraži igrače i pogledaj njihove bodove.",
 };
 
-export default function IgraciPage() {
-  const players = getPlayers();
-  const pointsMap = new Map(getRanking().map((r) => [r.playerId, r.points]));
+export const dynamic = "force-dynamic";
+
+export default async function IgraciPage() {
+  const [players, ranking] = await Promise.all([getPlayers(), getRanking()]);
+  const pointsMap = new Map(ranking.map((r) => [r.playerId, r.points]));
   const lite: PlayerLite[] = players.map((p) => ({
     id: p.id,
     name: playerName(p),

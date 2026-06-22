@@ -8,8 +8,25 @@ export const metadata: Metadata = {
   description: "Sve lige i sezone u okviru Vibe Padel Tour-a — grupe, plasmani i raspored.",
 };
 
-export default function LigePage() {
-  const clubs = getClubs();
+export const dynamic = "force-dynamic";
+
+export default async function LigePage() {
+  const clubs = await getClubs();
+  const clubsWithLeagues = await Promise.all(
+    clubs.map(async (club) => {
+      const leagues = await getLeaguesForClub(club.id);
+      const withCounts = await Promise.all(
+        leagues.map(async (l) => {
+          const [groups, standings] = await Promise.all([
+            getGroups(l.clubId, l.id),
+            getStandings(l.clubId, l.id),
+          ]);
+          return { league: l, groups: groups.length, teams: standings.length };
+        })
+      );
+      return { club, leagues: withCounts };
+    })
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
@@ -20,8 +37,7 @@ export default function LigePage() {
       />
 
       <div className="mt-12 space-y-16">
-        {clubs.map((club) => {
-          const leagues = getLeaguesForClub(club.id);
+        {clubsWithLeagues.map(({ club, leagues }) => {
           if (leagues.length === 0) return null;
           return (
             <div key={club.id}>
@@ -37,13 +53,13 @@ export default function LigePage() {
                 </div>
               </div>
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {leagues.map((l) => (
+                {leagues.map(({ league, groups, teams }) => (
                   <LeagueCard
-                    key={l.id}
-                    league={l}
+                    key={league.id}
+                    league={league}
                     clubName={club.name}
-                    groups={getGroups(l.clubId, l.id).length}
-                    teams={getStandings(l.clubId, l.id).length}
+                    groups={groups}
+                    teams={teams}
                   />
                 ))}
               </div>

@@ -22,8 +22,10 @@ const VALUES = [
   },
 ];
 
-export default function ONamaPage() {
-  const stats = getStats();
+export const dynamic = "force-dynamic";
+
+export default async function ONamaPage() {
+  const stats = await getStats();
   return (
     <>
       <section className="court-grid bg-ink text-white">

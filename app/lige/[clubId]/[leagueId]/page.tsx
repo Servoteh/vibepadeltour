@@ -6,7 +6,6 @@ import { LeagueView } from "@/components/LeagueView";
 import {
   getClub,
   getLeague,
-  getLeagues,
   getGroups,
   getStandingsForGroup,
   getRounds,
@@ -14,12 +13,7 @@ import {
 
 type Params = { clubId: string; leagueId: string };
 
-export function generateStaticParams() {
-  return getLeagues().map((l) => ({
-    clubId: String(l.clubId),
-    leagueId: String(l.id),
-  }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -27,7 +21,7 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { clubId, leagueId } = await params;
-  const league = getLeague(Number(clubId), Number(leagueId));
+  const league = await getLeague(Number(clubId), Number(leagueId));
   return { title: league?.name ?? "Liga" };
 }
 
@@ -35,19 +29,21 @@ export default async function LeagueDetail({ params }: { params: Promise<Params>
   const { clubId, leagueId } = await params;
   const cId = Number(clubId);
   const lId = Number(leagueId);
-  const league = getLeague(cId, lId);
-  const club = getClub(cId);
+  const [league, club, groups, rounds] = await Promise.all([
+    getLeague(cId, lId),
+    getClub(cId),
+    getGroups(cId, lId),
+    getRounds(cId, lId),
+  ]);
   if (!league || !club) notFound();
 
-  const groups = getGroups(cId, lId);
-  const standingsByGroup: Record<number, ReturnType<typeof getStandingsForGroup>> = {};
+  const standingsByGroup: Record<number, Awaited<ReturnType<typeof getStandingsForGroup>>> = {};
   let totalTeams = 0;
-  for (const g of groups) {
-    const rows = getStandingsForGroup(g.id);
-    standingsByGroup[g.id] = rows;
-    totalTeams += rows.length;
-  }
-  const rounds = getRounds(cId, lId);
+  const groupStandings = await Promise.all(groups.map((g) => getStandingsForGroup(g.id)));
+  groups.forEach((g, i) => {
+    standingsByGroup[g.id] = groupStandings[i];
+    totalTeams += groupStandings[i].length;
+  });
   const intro = league.description?.split("\n").filter(Boolean).slice(0, 2).join(" ");
 
   return (
