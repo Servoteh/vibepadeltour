@@ -535,6 +535,88 @@ export async function createLeague(_prev: ActionState, formData: FormData): Prom
   };
 }
 
+// Brzi unos: jedan submit za celo kolo (sve ekizpe grupe/liga).
+// can_<tid> (checkbox = može da igra), pref_<tid> (željeni sat), dbl_<tid> (dupli).
+export async function saveRoundConstraints(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const roundId = Number(formData.get("round_id"));
+  if (!roundId) return { error: "Nedostaje kolo." };
+
+  const parsed = formData
+    .getAll("row")
+    .map(String)
+    .map((r) => {
+      const [g, t] = r.split(":").map(Number);
+      return { gid: g, tid: t };
+    })
+    .filter((r) => r.tid);
+  const tids = parsed.map((r) => r.tid);
+
+  const sb = supabaseAdmin();
+  if (tids.length) {
+    await sb.from("team_unavailability").delete().eq("round_id", roundId).in("team_id", tids);
+    await sb.from("team_preference").delete().eq("round_id", roundId).in("team_id", tids);
+    await sb.from("team_double_requests").delete().eq("round_id", roundId).in("team_id", tids);
+  }
+
+  const unavail: Record<string, unknown>[] = [];
+  const pref: Record<string, unknown>[] = [];
+  const dbl: Record<string, unknown>[] = [];
+  for (const { gid, tid } of parsed) {
+    const can = formData.has(`can_${tid}`);
+    const prefH = String(formData.get(`pref_${tid}`) ?? "");
+    const isDbl = formData.has(`dbl_${tid}`);
+    if (!can) unavail.push({ group_id: gid, team_id: tid, round_id: roundId, hour: null, source: "admin" });
+    if (can && prefH)
+      pref.push({ group_id: gid, team_id: tid, round_id: roundId, hour: Number(prefH), source: "admin" });
+    if (isDbl) dbl.push({ group_id: gid, team_id: tid, round_id: roundId, source: "admin" });
+  }
+  if (unavail.length) {
+    const { error } = await sb.from("team_unavailability").insert(unavail);
+    if (error) return { error: error.message };
+  }
+  if (pref.length) {
+    const { error } = await sb.from("team_preference").insert(pref);
+    if (error) return { error: error.message };
+  }
+  if (dbl.length) {
+    const { error } = await sb.from("team_double_requests").insert(dbl);
+    if (error) return { error: error.message };
+  }
+  revalidatePath("/admin/raspored");
+  return { ok: true, message: "Sačuvano." };
+}
+
+// ——— Kapiteni (magic-link) ———
+export async function createCaptain(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  const [, teamId] = String(formData.get("team") ?? "").split(":").map(Number);
+  const email = String(formData.get("email") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!clubId || !leagueId || !teamId) return { error: "Izaberi ligu i ekipu." };
+
+  const token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, "");
+  const { error } = await supabaseAdmin()
+    .from("captains")
+    .upsert(
+      { team_id: teamId, club_id: clubId, league_id: leagueId, email, name, token },
+      { onConflict: "team_id,league_id" }
+    );
+  if (error) return { error: error.message };
+  revalidatePath("/admin/kapiteni");
+  return { ok: true, message: "Kapiten sačuvan (link generisan)." };
+}
+
+export async function deleteCaptain(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!id) return;
+  const { error } = await supabaseAdmin().from("captains").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/kapiteni");
+}
+
 export async function removeConstraint(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));

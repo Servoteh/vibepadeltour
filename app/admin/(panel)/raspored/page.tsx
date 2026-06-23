@@ -5,10 +5,9 @@ import {
   teamNameKey,
   type LeagueScheduleData,
 } from "@/lib/admin-data";
-import { acceptProposal, rejectProposal, clearRoundSchedule, removeConstraint } from "@/app/admin/actions";
+import { acceptProposal, rejectProposal, clearRoundSchedule } from "@/app/admin/actions";
 import { GenerateForm } from "./GenerateForm";
-import { Constraints } from "./Constraints";
-import type { TeamOption } from "./TeamSelect";
+import { QuickGrid, type QuickTeam } from "./QuickGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +24,8 @@ export default async function RasporedPage({
   const roundId = sp.round ? Number(sp.round) : 0;
 
   const { leagues } = await getResultEntryData();
+  // Raspored se pravi SAMO za aktivne lige (završene se ne raspoređuju).
+  const activeLeagues = leagues.filter((l) => l.status !== "finished");
 
   let data: LeagueScheduleData | null = null;
   if (leagueKey) {
@@ -34,12 +35,6 @@ export default async function RasporedPage({
 
   const nameOf = (gid: number, tid: number) => data?.teamName[teamNameKey(gid, tid)] ?? `Tim ${tid}`;
   const roundName = (rid: number) => data?.rounds.find((r) => r.id === rid)?.name ?? `Kolo ${rid}`;
-
-  const teamOptions: TeamOption[] = data
-    ? data.groups.flatMap((g) =>
-        g.teams.map((t) => ({ groupId: g.id, teamId: t.teamId, label: `${t.teamName} · gr. ${g.name}` }))
-      )
-    : [];
 
   const roundFixtures = data && roundId ? data.fixtures.filter((f) => f.roundId === roundId) : [];
   const proposed = roundFixtures.filter((f) => f.status === "proposed");
@@ -53,29 +48,48 @@ export default async function RasporedPage({
   for (const f of data?.fixtures ?? [])
     fixturesByRound.set(f.roundId, (fixturesByRound.get(f.roundId) ?? 0) + 1);
 
-  const roundUnavail = (data?.unavailability ?? []).filter((u) => u.roundId === roundId);
-  const roundCancel = (data?.cancellations ?? []).filter((c) => c.roundId === roundId);
-  const roundDouble = (data?.doubles ?? []).filter((d) => d.roundId === roundId);
-  const roundPref = (data?.preferences ?? []).filter((p) => p.roundId === roundId);
+  // Brza tabela: stanje svake ekipe za izabrano kolo (default: može da igra).
+  const unavailSet = new Set(
+    (data?.unavailability ?? []).filter((u) => u.roundId === roundId).map((u) => u.teamId)
+  );
+  const prefMap = new Map(
+    (data?.preferences ?? []).filter((p) => p.roundId === roundId).map((p) => [p.teamId, p.hour])
+  );
+  const dblSet = new Set(
+    (data?.doubles ?? []).filter((d) => d.roundId === roundId).map((d) => d.teamId)
+  );
+  const quickTeams: QuickTeam[] = data
+    ? data.groups.flatMap((g) =>
+        g.teams.map((t) => ({
+          groupId: g.id,
+          teamId: t.teamId,
+          name: t.teamName,
+          groupName: g.name,
+          available: !unavailSet.has(t.teamId),
+          prefHour: prefMap.get(t.teamId) ?? null,
+          dbl: dblSet.has(t.teamId),
+        }))
+      )
+    : [];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-3xl font-bold text-navy">Raspored mečeva</h1>
         <p className="mt-2 text-muted">
-          Predlog kola na osnovu ranga i ograničenja. Teren 2 = najjači mečevi. Dupli termini idu uzastopno.
+          Samo aktivne lige. Predlog kola po rangu i ograničenjima: teren 2 = najjači mečevi, dupli termini idu uzastopno.
         </p>
       </div>
 
-      {/* Izbor lige */}
+      {/* Izbor (aktivne) lige */}
       <form method="get" className="flex flex-wrap items-center gap-3">
         <select
           name="league"
           defaultValue={leagueKey}
           className="rounded-xl border border-navy/15 bg-paper px-4 py-2.5 text-sm text-navy outline-none focus:border-gold/60"
         >
-          <option value="">— izaberi ligu —</option>
-          {leagues.map((l) => (
+          <option value="">— izaberi aktivnu ligu —</option>
+          {activeLeagues.map((l) => (
             <option key={`${l.clubId}:${l.id}`} value={`${l.clubId}:${l.id}`}>
               {l.name}
             </option>
@@ -88,7 +102,7 @@ export default async function RasporedPage({
 
       {data && (
         <>
-          {/* Kola */}
+          {/* Kola (tabovi) */}
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">Kola</h2>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -117,7 +131,15 @@ export default async function RasporedPage({
 
           {roundId > 0 && (
             <>
-              {/* Akcije */}
+              {/* Brzi unos: može da igra / termin / dva meča */}
+              <div className="space-y-3">
+                <h2 className="font-display text-lg font-bold text-navy">
+                  Dostupnost — {roundName(roundId)}
+                </h2>
+                <QuickGrid roundId={roundId} teams={quickTeams} />
+              </div>
+
+              {/* Generisanje / odobravanje */}
               <div className="flex flex-wrap items-center gap-3 rounded-xl border border-navy/8 bg-cream-2 p-4">
                 <GenerateForm leagueKey={leagueKey} roundId={roundId} />
                 {isProposed && (
@@ -201,76 +223,9 @@ export default async function RasporedPage({
                   </table>
                 </div>
               )}
-
-              {/* Ograničenja */}
-              <div className="space-y-4">
-                <h2 className="font-display text-lg font-bold text-navy">Ograničenja za {roundName(roundId)}</h2>
-                <Constraints leagueKey={leagueKey} teams={teamOptions} rounds={data.rounds} />
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <ConstraintList
-                    title="Nedostupne ekipe"
-                    table="team_unavailability"
-                    rows={roundUnavail.map((u) => ({
-                      id: u.id,
-                      label: `${nameOf(u.groupId, u.teamId)}${u.hour ? ` · ${u.hour}:00` : " · ceo termin"}`,
-                    }))}
-                  />
-                  <ConstraintList
-                    title="Otkazani mečevi"
-                    table="match_cancellations"
-                    rows={roundCancel.map((c) => ({ id: c.id, label: nameOf(c.groupId, c.teamId) }))}
-                  />
-                  <ConstraintList
-                    title="Dupli termini"
-                    table="team_double_requests"
-                    rows={roundDouble.map((d) => ({ id: d.id, label: nameOf(d.groupId, d.teamId) }))}
-                  />
-                  <ConstraintList
-                    title="Željeni termini"
-                    table="team_preference"
-                    rows={roundPref.map((p) => ({
-                      id: p.id,
-                      label: `${nameOf(p.groupId, p.teamId)}${p.hour ? ` · ${p.hour}:00` : ""}`,
-                    }))}
-                  />
-                </div>
-              </div>
             </>
           )}
         </>
-      )}
-    </div>
-  );
-}
-
-function ConstraintList({
-  title,
-  table,
-  rows,
-}: {
-  title: string;
-  table: string;
-  rows: { id: number; label: string }[];
-}) {
-  return (
-    <div className="rounded-xl border border-navy/8 bg-cream-2 p-4">
-      <h4 className="text-sm font-bold text-navy">{title}</h4>
-      {rows.length === 0 ? (
-        <p className="mt-2 text-xs text-muted">Nema unosa za ovo kolo.</p>
-      ) : (
-        <ul className="mt-2 space-y-1">
-          {rows.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-2 text-sm text-navy">
-              <span>{r.label}</span>
-              <form action={removeConstraint}>
-                <input type="hidden" name="id" value={r.id} />
-                <input type="hidden" name="table" value={table} />
-                <button className="text-xs text-red-600 hover:underline">ukloni</button>
-              </form>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
