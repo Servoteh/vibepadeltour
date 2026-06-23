@@ -258,6 +258,54 @@ export function teamNameKey(groupId: number, teamId: number): number {
   return groupId * 100000 + teamId;
 }
 
+// ——————————————————— Upravljanje ligom (Prioritet 2) ———————————————————
+
+export type ManageGroup = { id: number; name: string };
+export type ManagePair = {
+  groupId: number;
+  teamId: number;
+  teamName: string;
+  p1Name: string;
+  p2Name: string;
+  played: number;
+  won: number;
+  points: number;
+  gamesDiff: number;
+  setsDiff: number;
+};
+
+export async function getLeagueManageData(
+  clubId: number,
+  leagueId: number
+): Promise<{ groups: ManageGroup[]; pairs: ManagePair[] }> {
+  const sb = supabaseAdmin();
+  const [gr, st] = await Promise.all([
+    sb.from("groups").select("id, name").eq("club_id", clubId).eq("league_id", leagueId).order("name"),
+    sb.from("standings").select("*").eq("club_id", clubId).eq("league_id", leagueId),
+  ]);
+  if (gr.error) throw new Error(`groups: ${gr.error.message}`);
+  if (st.error) throw new Error(`standings: ${st.error.message}`);
+
+  const pairs: ManagePair[] = (st.data ?? []).map((s) => ({
+    groupId: s.group_id as number,
+    teamId: s.team_id as number,
+    teamName: clean(s.team_name as string) || `Tim ${s.team_id}`,
+    p1Name: clean((s.player1_name as string) ?? ""),
+    p2Name: clean((s.player2_name as string) ?? ""),
+    played: (s.matches_played as number) ?? 0,
+    won: (s.matches_won as number) ?? 0,
+    points: (s.points as number) ?? 0,
+    gamesDiff: (s.games_diff as number) ?? 0,
+    setsDiff: (s.sets_diff as number) ?? 0,
+  }));
+  pairs.sort((a, b) => a.teamName.localeCompare(b.teamName, "sr"));
+
+  return {
+    groups: (gr.data ?? []).map((g) => ({ id: g.id as number, name: clean(g.name as string) })),
+    pairs,
+  };
+}
+
 // ——————————————————— Moj profil ———————————————————
 
 export type TeamProfile = {

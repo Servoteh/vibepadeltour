@@ -631,6 +631,205 @@ export async function deleteCaptain(formData: FormData): Promise<void> {
   revalidatePath("/admin/kapiteni");
 }
 
+// ——————————————————— Prioritet 2: admin & podaci ———————————————————
+
+const revalidateLeagues = () => {
+  revalidatePath("/admin/lige");
+  revalidatePath("/admin/ekipe");
+  revalidatePath("/lige", "layout");
+  revalidatePath("/");
+};
+
+async function nextId(table: string): Promise<number> {
+  const { data } = await supabaseAdmin()
+    .from(table)
+    .select("id")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return ((data?.id as number) ?? 0) + 1;
+}
+
+// ——— Lige ———
+export async function updateLeague(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  if (!clubId || !leagueId) return { error: "Nedostaje liga." };
+  const name = String(formData.get("name") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim(); // 'active' | 'finished'
+  const description = String(formData.get("description") ?? "");
+  const rules = String(formData.get("rules") ?? "");
+  if (!name) return { error: "Naziv ne sme biti prazan." };
+
+  const { error } = await supabaseAdmin()
+    .from("leagues")
+    .update({ name, status, description, rules })
+    .eq("id", leagueId)
+    .eq("club_id", clubId);
+  if (error) return { error: error.message };
+  revalidateLeagues();
+  return { ok: true, message: "Liga sačuvana." };
+}
+
+// ——— Grupe ———
+export async function createGroup(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  const name = String(formData.get("name") ?? "").trim();
+  if (!clubId || !leagueId || !name) return { error: "Izaberi ligu i unesi naziv grupe." };
+  const id = await nextId("groups");
+  const { error } = await supabaseAdmin()
+    .from("groups")
+    .insert({ id, club_id: clubId, league_id: leagueId, name });
+  if (error) return { error: error.message };
+  revalidateLeagues();
+  return { ok: true, message: `Grupa „${name}" dodata.` };
+}
+
+export async function renameGroup(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return;
+  const { error } = await supabaseAdmin().from("groups").update({ name }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateLeagues();
+}
+
+export async function deleteGroup(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!id) return;
+  const { error } = await supabaseAdmin().from("groups").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidateLeagues();
+}
+
+// ——— Parovi (timovi) i upis u grupu ———
+export async function addPair(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  const groupId = Number(formData.get("group_id"));
+  const p1 = Number(formData.get("player1_id"));
+  const p2 = Number(formData.get("player2_id"));
+  let name = String(formData.get("name") ?? "").trim();
+  if (!clubId || !leagueId || !groupId || !p1 || !p2) return { error: "Izaberi grupu i oba igrača." };
+  if (p1 === p2) return { error: "Izaberi dva različita igrača." };
+
+  const sb = supabaseAdmin();
+  const { data: players } = await sb.from("players").select("id, first_name, last_name").in("id", [p1, p2]);
+  const nm = (id: number) => {
+    const pl = (players ?? []).find((x) => (x.id as number) === id);
+    return pl ? `${(pl.first_name as string) ?? ""} ${(pl.last_name as string) ?? ""}`.replace(/\s+/g, " ").trim() : `Igrač ${id}`;
+  };
+  const p1name = nm(p1);
+  const p2name = nm(p2);
+  if (!name) name = `${p1name} / ${p2name}`;
+
+  const teamId = await nextId("teams");
+  const { error: terr } = await sb.from("teams").insert({ id: teamId, player1_id: p1, player2_id: p2, name });
+  if (terr) return { error: terr.message };
+
+  const { error: serr } = await sb.from("standings").insert({
+    group_id: groupId,
+    team_id: teamId,
+    club_id: clubId,
+    league_id: leagueId,
+    team_name: name,
+    player1_id: p1,
+    player1_name: p1name,
+    player2_id: p2,
+    player2_name: p2name,
+    matches_played: 0,
+    matches_won: 0,
+    games_diff: 0,
+    sets_diff: 0,
+    points: 0,
+  });
+  if (serr) return { error: serr.message };
+  revalidateLeagues();
+  return { ok: true, message: `Par „${name}" upisan.` };
+}
+
+export async function removePair(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const groupId = Number(formData.get("group_id"));
+  const teamId = Number(formData.get("team_id"));
+  if (!groupId || !teamId) return;
+  // Skida par iz grupe (red u standings); sam tim ostaje u bazi.
+  const { error } = await supabaseAdmin()
+    .from("standings")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("team_id", teamId);
+  if (error) throw new Error(error.message);
+  revalidateLeagues();
+}
+
+// ——— Ručna korekcija standings-a ———
+export async function updateStanding(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const groupId = Number(formData.get("group_id"));
+  const teamId = Number(formData.get("team_id"));
+  if (!groupId || !teamId) return;
+  const num = (k: string) => {
+    const v = Number(formData.get(k));
+    return Number.isFinite(v) ? v : 0;
+  };
+  const { error } = await supabaseAdmin()
+    .from("standings")
+    .update({
+      matches_played: num("matches_played"),
+      matches_won: num("matches_won"),
+      points: num("points"),
+      games_diff: num("games_diff"),
+      sets_diff: num("sets_diff"),
+    })
+    .eq("group_id", groupId)
+    .eq("team_id", teamId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/ekipe");
+  revalidatePath("/rang");
+  revalidatePath("/lige", "layout");
+}
+
+// ——— Klubovi ———
+export async function createClub(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Naziv kluba je obavezan." };
+  const id = await nextId("clubs");
+  const { error } = await supabaseAdmin().from("clubs").insert({
+    id,
+    name,
+    description: String(formData.get("description") ?? ""),
+    rules: String(formData.get("rules") ?? ""),
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/klubovi");
+  revalidatePath("/lige", "layout");
+  return { ok: true, message: `Klub „${name}" kreiran.` };
+}
+
+export async function updateClub(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id || !name) return { error: "Nedostaje klub ili naziv." };
+  const { error } = await supabaseAdmin()
+    .from("clubs")
+    .update({
+      name,
+      description: String(formData.get("description") ?? ""),
+      rules: String(formData.get("rules") ?? ""),
+    })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath("/admin/klubovi");
+  revalidatePath("/lige", "layout");
+  return { ok: true, message: "Klub sačuvan." };
+}
+
 export async function removeConstraint(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));

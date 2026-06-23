@@ -36,15 +36,15 @@ Legenda: ✅ gotovo · 🔜 sledeće · ⏳ planirano · 💡 ideja
 
 ---
 
-## ⏳ Prioritet 2 — admin & podaci
+## Prioritet 2 — admin & podaci (✅ urađeno 2026-06-23, osim API refresh)
 
-- [ ] **CRUD timova/parova** — kreiranje/izmena para (2 igrača + naziv), upis u grupu/standings (sad samo igrači).
-- [ ] **CRUD grupa** — dodavanje/izmena grupa unutar lige (za novo-kreirane lige bez grupa).
-- [ ] **Upis ekipa u novu ligu** — prijava parova za aktivnu sezonu (povezuje „kreiraj ligu" sa raspored­om).
-- [ ] **Izmena lige** — naziv, status (aktivna↔završena), pravila, opis.
-- [ ] **CRUD klubova** — naziv, opis, pravila.
-- [ ] **Ručna korekcija standings-a** — ispravka bodova/diff bez brisanja meča.
-- [ ] **Osvežavanje sa starog API-ja** — dugme/skripta za re-import najnovijih parova (ako zatreba).
+- [x] **CRUD timova/parova** — `/admin/ekipe`: upis para (2 igrača, auto naziv) u grupu (kreira tim + red u standings), skidanje para iz grupe.
+- [x] **CRUD grupa** — `/admin/ekipe`: dodaj/preimenuj/obriši grupu u ligi.
+- [x] **Upis ekipa u novu ligu** — preko `/admin/ekipe` (izaberi ligu → grupa → upiši parove).
+- [x] **Izmena lige** — `/admin/lige`: status (aktivna↔završena), naziv, opis, pravila.
+- [x] **CRUD klubova** — `/admin/klubovi`: kreiranje/izmena (naziv, opis, pravila).
+- [x] **Ručna korekcija standings-a** — `/admin/ekipe`: direktna izmena odigrano/pobede/bodovi/gem±/set±.
+- [ ] **Osvežavanje sa starog API-ja** — dugme/skripta za re-import najnovijih parova (kasnije, sa „pregled pa potvrdi").
 
 ---
 
