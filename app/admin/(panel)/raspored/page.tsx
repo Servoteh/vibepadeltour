@@ -5,7 +5,13 @@ import {
   teamNameKey,
   type LeagueScheduleData,
 } from "@/lib/admin-data";
-import { acceptProposal, rejectProposal, clearRoundSchedule, moveFixture } from "@/app/admin/actions";
+import {
+  acceptProposal,
+  rejectProposal,
+  clearRoundSchedule,
+  moveFixture,
+  deleteRound,
+} from "@/app/admin/actions";
 import { GenerateForm } from "./GenerateForm";
 import { QuickGrid, type QuickTeam } from "./QuickGrid";
 
@@ -173,6 +179,12 @@ export default async function RasporedPage({
                       ? `Prihvaćeno: ${accepted.length} mečeva`
                       : "Nema rasporeda za ovo kolo"}
                 </span>
+                <form action={deleteRound} className="ml-auto">
+                  <input type="hidden" name="round_id" value={roundId} />
+                  <button className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Obriši kolo
+                  </button>
+                </form>
               </div>
 
               {/* Mreža teren × sat */}

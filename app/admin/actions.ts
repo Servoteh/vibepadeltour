@@ -720,6 +720,30 @@ export async function updateLeague(_prev: ActionState, formData: FormData): Prom
   return { ok: true, message: "Liga sačuvana." };
 }
 
+// Brisanje cele lige (kaskadno: grupe→standings/fixtures, kola→ograničenja; + kapiteni).
+export async function deleteLeague(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  if (!clubId || !leagueId) return;
+  const sb = supabaseAdmin();
+  await sb.from("captains").delete().eq("club_id", clubId).eq("league_id", leagueId);
+  const { error } = await sb.from("leagues").delete().eq("id", leagueId).eq("club_id", clubId);
+  if (error) throw new Error(error.message);
+  revalidateLeagues();
+}
+
+// Brisanje jednog kola (kaskadno: fixtures + ograničenja; matches ostaju, round_id→null).
+export async function deleteRound(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("round_id"));
+  if (!id) return;
+  const { error } = await supabaseAdmin().from("rounds").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/raspored");
+  revalidatePath("/admin/lige");
+  revalidatePath("/lige", "layout");
+}
+
 // ——— Grupe ———
 export async function createGroup(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireAdmin();
