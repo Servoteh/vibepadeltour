@@ -5,7 +5,7 @@ import {
   teamNameKey,
   type LeagueScheduleData,
 } from "@/lib/admin-data";
-import { acceptProposal, rejectProposal, clearRoundSchedule } from "@/app/admin/actions";
+import { acceptProposal, rejectProposal, clearRoundSchedule, moveFixture } from "@/app/admin/actions";
 import { GenerateForm } from "./GenerateForm";
 import { QuickGrid, type QuickTeam } from "./QuickGrid";
 
@@ -221,6 +221,74 @@ export default async function RasporedPage({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Odloženo (otkazani parovi za ovo kolo) */}
+              {(data.cancellations ?? []).filter((c) => c.roundId === roundId).length > 0 && (
+                <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-4">
+                  <span className="text-sm font-semibold text-amber-800">Odloženo: </span>
+                  <span className="text-sm text-amber-900">
+                    {(data.cancellations ?? [])
+                      .filter((c) => c.roundId === roundId)
+                      .map((c) => nameOf(c.groupId, c.teamId))
+                      .join(", ")}
+                  </span>
+                </div>
+              )}
+
+              {/* Ručno premeštanje */}
+              {showing.length > 0 && (
+                <div>
+                  <h3 className="font-display text-lg font-bold text-navy">Premeštanje mečeva</h3>
+                  <p className="mt-1 text-sm text-muted">
+                    Izaberi novi teren i sat. Ako je slot zauzet, mečevi se zamene.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {showing
+                      .slice()
+                      .sort((a, b) => a.hour - b.hour || a.court - b.court)
+                      .map((f) => (
+                        <form
+                          key={f.id}
+                          action={moveFixture}
+                          className="flex flex-wrap items-center gap-2 rounded-xl border border-navy/8 bg-paper px-4 py-2 text-sm shadow-[var(--shadow-soft)]"
+                        >
+                          <input type="hidden" name="fixture_id" value={f.id} />
+                          <span className="min-w-[220px] flex-1 text-navy">
+                            {nameOf(f.groupId, f.team1Id)} <span className="text-muted">vs</span>{" "}
+                            {nameOf(f.groupId, f.team2Id)}
+                          </span>
+                          <select
+                            name="court"
+                            defaultValue={f.court}
+                            className="rounded-lg border border-navy/15 bg-paper px-2 py-1"
+                            aria-label="Teren"
+                          >
+                            {COURTS.map((c) => (
+                              <option key={c} value={c}>
+                                Teren {c}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            name="hour"
+                            defaultValue={f.hour}
+                            className="rounded-lg border border-navy/15 bg-paper px-2 py-1"
+                            aria-label="Sat"
+                          >
+                            {HOURS.map((h) => (
+                              <option key={h} value={h}>
+                                {h}:00
+                              </option>
+                            ))}
+                          </select>
+                          <button className="rounded-full bg-navy/90 px-3 py-1 text-xs font-semibold text-white hover:bg-navy">
+                            Premesti
+                          </button>
+                        </form>
+                      ))}
+                  </div>
                 </div>
               )}
             </>

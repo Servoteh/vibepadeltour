@@ -48,14 +48,14 @@ Legenda: ✅ gotovo · 🔜 sledeće · ⏳ planirano · 💡 ideja
 
 ---
 
-## ⏳ Prioritet 3 — scheduler poboljšanja
+## Prioritet 3 — scheduler poboljšanja (✅ urađeno 2026-06-23)
 
-- [ ] Poštovanje **otkazivanja** u predlogu (sad skida par; dodati prikaz „odloženo").
-- [ ] **Ne ponavljaj** parove koji su već odigrani (čitaj iz `matches`) pri generisanju.
-- [ ] **Balans terena/sati** — ravnomernije raspoređivanje, ne samo teren-2 pravilo.
-- [ ] **Ručno prevlačenje** meča u drugi slot pre prihvatanja (drag&drop ili dropdown po ćeliji).
-- [ ] **Više dana po kolu** (ako se kolo igra kroz vikend).
-- [ ] **Validacije**: upozori kad nema dovoljno slotova ili kad nedostupnost blokira par.
+- [x] Otkazivanje → **„Odloženo"**: otkazani parovi se obeleže (admin + javno na strani lige), ne ulaze u mrežu.
+- [x] **Ne ponavljaj** već odigrane parove (čita iz `matches`) pri generisanju.
+- [x] **Balans paralelno po satu**: mečevi se šire po terenima u istom satu; najjači meč svakog sata na teren 2. Svaki meč = 1 sat.
+- [x] **Ručno premeštanje** meča (po ćeliji: izbor teren/sat; zamena ako je zauzeto) pre/posle prihvatanja.
+- [x] **Validacije**: poruka koliko je raspoređeno/neuspelo pri generisanju.
+- [ ] **Više dana po kolu** (ako se kolo igra kroz vikend) — kasnije.
 
 ---
 

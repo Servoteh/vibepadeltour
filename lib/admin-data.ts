@@ -306,6 +306,34 @@ export async function getLeagueManageData(
   };
 }
 
+// Odložene (otkazane) ekipe po kolu — za prikaz „Odloženo" (javno + admin).
+export async function getPostponedByRound(
+  clubId: number,
+  leagueId: number
+): Promise<Map<number, string[]>> {
+  const sb = supabaseAdmin();
+  const [st, rounds] = await Promise.all([
+    sb.from("standings").select("team_id, team_name").eq("club_id", clubId).eq("league_id", leagueId),
+    sb.from("rounds").select("id").eq("club_id", clubId).eq("league_id", leagueId),
+  ]);
+  const nameById = new Map<number, string>();
+  for (const s of st.data ?? []) nameById.set(s.team_id as number, clean(s.team_name as string));
+
+  const ids = (rounds.data ?? []).map((r) => r.id as number);
+  const { data: cancels } = await sb
+    .from("match_cancellations")
+    .select("round_id, team_id")
+    .in("round_id", ids.length ? ids : [-1]);
+
+  const map = new Map<number, string[]>();
+  for (const c of cancels ?? []) {
+    const rid = c.round_id as number;
+    const nm = nameById.get(c.team_id as number) || `Tim ${c.team_id}`;
+    (map.get(rid) ?? map.set(rid, []).get(rid)!).push(nm);
+  }
+  return map;
+}
+
 // ——————————————————— Moj profil ———————————————————
 
 export type TeamProfile = {

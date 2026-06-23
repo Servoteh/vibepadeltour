@@ -229,13 +229,20 @@ export async function generateProposal(_prev: ActionState, formData: FormData): 
     list.push(s.team_id as number);
   }
 
-  // Ograničenja za ovo kolo.
-  const [unRes, caRes, dbRes, prRes] = await Promise.all([
+  // Ograničenja za ovo kolo + već odigrani parovi (da se ne ponavljaju).
+  const [unRes, caRes, dbRes, prRes, mRes] = await Promise.all([
     sb.from("team_unavailability").select("team_id, hour").eq("round_id", roundId),
     sb.from("match_cancellations").select("team_id").eq("round_id", roundId),
     sb.from("team_double_requests").select("team_id, group_id").eq("round_id", roundId),
     sb.from("team_preference").select("team_id, hour").eq("round_id", roundId),
+    sb.from("matches").select("group_id, team1_id, team2_id").eq("club_id", clubId).eq("league_id", leagueId),
   ]);
+  const played = new Set<string>();
+  for (const m of mRes.data ?? []) {
+    const a = m.team1_id as number;
+    const b = m.team2_id as number;
+    played.add(`${m.group_id as number}:${Math.min(a, b)}:${Math.max(a, b)}`);
+  }
   const preferredHours = new Map<number, number>();
   for (const p of prRes.data ?? []) preferredHours.set(p.team_id as number, p.hour as number);
   const unavailable = new Map<number, Set<number>>();
@@ -259,7 +266,7 @@ export async function generateProposal(_prev: ActionState, formData: FormData): 
   const addPair = (gid: number, a: number, b: number) => {
     if (a === b || cancelled.has(a) || cancelled.has(b)) return;
     const key = `${gid}:${Math.min(a, b)}:${Math.max(a, b)}`;
-    if (seen.has(key)) return;
+    if (seen.has(key) || played.has(key)) return; // ne ponavljaj već odigrane parove
     seen.add(key);
     matches.push({ groupId: gid, team1Id: a, team2Id: b, strength: sOf(a, b) });
   };
@@ -336,6 +343,48 @@ export async function rejectProposal(formData: FormData): Promise<void> {
     .eq("status", "proposed");
   if (error) throw new Error(error.message);
   revalidatePath("/admin/raspored");
+}
+
+// Ručno premeštanje meča u drugi (teren, sat). Ako je ciljni slot zauzet, zameni mečeve.
+export async function moveFixture(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("fixture_id"));
+  const court = Number(formData.get("court"));
+  const hour = Number(formData.get("hour"));
+  if (!id || !court || !hour) return;
+
+  const sb = supabaseAdmin();
+  const { data: fx } = await sb
+    .from("fixtures")
+    .select("id, round_id, court, hour")
+    .eq("id", id)
+    .maybeSingle();
+  if (!fx) return;
+  const roundId = fx.round_id as number;
+  const oldCourt = fx.court as number;
+  const oldHour = fx.hour as number;
+  if (oldCourt === court && oldHour === hour) return;
+
+  const { data: occ } = await sb
+    .from("fixtures")
+    .select("id")
+    .eq("round_id", roundId)
+    .eq("court", court)
+    .eq("hour", hour)
+    .maybeSingle();
+
+  if (occ && (occ.id as number) !== id) {
+    // Zamena preko privremenog slota (unique(round,court,hour)).
+    await sb.from("fixtures").update({ court: -1, hour: -1 }).eq("id", id);
+    await sb.from("fixtures").update({ court: oldCourt, hour: oldHour }).eq("id", occ.id);
+    await sb.from("fixtures").update({ court, hour }).eq("id", id);
+  } else {
+    await sb.from("fixtures").update({ court, hour }).eq("id", id);
+  }
+
+  revalidatePath("/admin/raspored");
+  revalidatePath("/lige", "layout");
+  revalidatePath("/");
 }
 
 export async function clearRoundSchedule(formData: FormData): Promise<void> {

@@ -74,91 +74,95 @@ function blocked(unavail: Map<number, Set<number>> | undefined, teamId: number, 
   return s.has(-1) || s.has(hour);
 }
 
-// Dodeljuje mečeve u mrežu (teren, sat).
-//  Faza 1: ekipe sa 2 meča (prijavile dupli termin) → uzastopni satovi.
-//  Faza 2: ostali mečevi, najjači prvi, sa prioritetom terena 2.
+// Dodeljuje mečeve u mrežu (teren, sat). Svaki meč traje tačno 1 sat (jedan slot).
+//  Balans „paralelno po satu": mečevi se prvo šire po terenima u istom satu
+//  (popunjava se najraniji sat sa slobodnim terenom), pa tek onda sledeći sat.
+//  U svakom satu NAJJAČI meč ide na teren 2.
+//  Dupli termini (consecutiveTeams) → dva meča ekipe u uzastopnim satovima.
+//  Poštuje nedostupnost i željeni sat (preferredHours).
 export function assignSlots(matches: SchedMatch[], opts: AssignOptions = {}): AssignResult {
   const courts = opts.courts ?? DEFAULT_COURTS;
   const hours = opts.hours ?? DEFAULT_HOURS;
   const unavail = opts.unavailable;
   const consecutive = opts.consecutiveTeams ?? new Set<number>();
-  const courtOrder = COURT_PRIORITY.filter((c) => courts.includes(c));
+  const preferred = opts.preferredHours;
+  const cap = courts.length; // mečeva po satu (jedan po terenu)
 
-  const occupied = new Set<string>(); // "court:hour"
-  const teamHour = new Set<string>(); // "teamId:hour"
-  const assigned: SlotAssignment[] = [];
+  const hourMatches = new Map<number, SchedMatch[]>();
+  const hourTeams = new Map<number, Set<number>>();
+  for (const h of hours) {
+    hourMatches.set(h, []);
+    hourTeams.set(h, new Set<number>());
+  }
 
-  // Nađi slobodan teren za meč u datom satu (prioritet terena 2), uz provere.
-  const freeCourt = (m: SchedMatch, hour: number): number | null => {
-    if (blocked(unavail, m.team1Id, hour) || blocked(unavail, m.team2Id, hour)) return null;
-    if (teamHour.has(`${m.team1Id}:${hour}`) || teamHour.has(`${m.team2Id}:${hour}`)) return null;
-    for (const court of courtOrder) if (!occupied.has(`${court}:${hour}`)) return court;
-    return null;
+  const canPlace = (m: SchedMatch, h: number): boolean => {
+    if (blocked(unavail, m.team1Id, h) || blocked(unavail, m.team2Id, h)) return false;
+    const ts = hourTeams.get(h)!;
+    if (ts.has(m.team1Id) || ts.has(m.team2Id)) return false;
+    return hourMatches.get(h)!.length < cap;
   };
-  const occupy = (m: SchedMatch, court: number, hour: number) => {
-    occupied.add(`${court}:${hour}`);
-    teamHour.add(`${m.team1Id}:${hour}`);
-    teamHour.add(`${m.team2Id}:${hour}`);
-    assigned.push({ ...m, court, hour });
+  const place = (m: SchedMatch, h: number) => {
+    hourMatches.get(h)!.push(m);
+    const ts = hourTeams.get(h)!;
+    ts.add(m.team1Id);
+    ts.add(m.team2Id);
   };
 
+  const sorted = [...matches].sort((a, b) => b.strength - a.strength);
   const handled = new Set<SchedMatch>();
+  const unassigned: SchedMatch[] = [];
 
-  // ——— Faza 1: dupli termini (uzastopni satovi) ———
+  // ——— Faza 1: dupli termini → uzastopni satovi ———
   if (consecutive.size > 0) {
     const byTeam = new Map<number, SchedMatch[]>();
-    for (const m of matches) {
+    for (const m of sorted) {
       for (const t of [m.team1Id, m.team2Id]) {
         if (consecutive.has(t)) (byTeam.get(t) ?? byTeam.set(t, []).get(t)!).push(m);
       }
     }
     for (const [, ms] of byTeam) {
-      const pair = [...ms].sort((a, b) => b.strength - a.strength).slice(0, 2);
-      if (pair.length < 2 || pair.some((m) => handled.has(m))) continue;
-      const [m1, m2] = pair; // m1 jači → ide na teren 2 prioritetno
-      let done = false;
-      for (let i = 0; i < hours.length - 1 && !done; i++) {
+      const pair = ms.filter((m) => !handled.has(m)).slice(0, 2);
+      if (pair.length < 2) continue;
+      const [m1, m2] = pair;
+      for (let i = 0; i < hours.length - 1; i++) {
         const h1 = hours[i];
         const h2 = hours[i + 1];
-        if (h2 !== h1 + 1) continue; // stvarno uzastopni satovi
-        const c1 = freeCourt(m1, h1);
-        if (c1 == null) continue;
-        occupy(m1, c1, h1);
-        const c2 = freeCourt(m2, h2);
-        if (c2 == null) {
-          // poništi m1 i probaj dalje
-          occupied.delete(`${c1}:${h1}`);
-          teamHour.delete(`${m1.team1Id}:${h1}`);
-          teamHour.delete(`${m1.team2Id}:${h1}`);
-          assigned.pop();
-          continue;
+        if (h2 !== h1 + 1) continue;
+        if (canPlace(m1, h1) && canPlace(m2, h2)) {
+          place(m1, h1);
+          place(m2, h2);
+          handled.add(m1);
+          handled.add(m2);
+          break;
         }
-        occupy(m2, c2, h2);
-        handled.add(m1);
-        handled.add(m2);
-        done = true;
       }
     }
   }
 
-  // ——— Faza 2: ostali mečevi (najjači prvi, teren 2) ———
-  const preferred = opts.preferredHours;
-  const unassigned: SchedMatch[] = [];
-  const rest = matches.filter((m) => !handled.has(m)).sort((a, b) => b.strength - a.strength);
-  for (const m of rest) {
-    // Željeni sat (ako neka od ekipa ima preferenciju) probaj prvi.
+  // ——— Faza 2: dodela sata (najraniji slobodan; željeni sat prvi) ———
+  for (const m of sorted) {
+    if (handled.has(m)) continue;
     const pref = preferred?.get(m.team1Id) ?? preferred?.get(m.team2Id);
-    const hourOrder = pref != null ? [pref, ...hours.filter((h) => h !== pref)] : hours;
+    const order = pref != null ? [pref, ...hours.filter((h) => h !== pref)] : hours;
     let placed = false;
-    for (const hour of hourOrder) {
-      const court = freeCourt(m, hour);
-      if (court != null) {
-        occupy(m, court, hour);
+    for (const h of order) {
+      if (canPlace(m, h)) {
+        place(m, h);
         placed = true;
         break;
       }
     }
     if (!placed) unassigned.push(m);
+  }
+
+  // ——— Faza B: dodela terena unutar sata (najjači → teren 2) ———
+  const courtOrder = COURT_PRIORITY.filter((c) => courts.includes(c));
+  const assigned: SlotAssignment[] = [];
+  for (const h of hours) {
+    const ms = hourMatches.get(h)!.slice().sort((a, b) => b.strength - a.strength);
+    ms.forEach((m, idx) => {
+      assigned.push({ ...m, court: courtOrder[idx] ?? courts[idx] ?? idx + 1, hour: h });
+    });
   }
 
   return { assigned, unassigned };

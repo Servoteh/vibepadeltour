@@ -11,6 +11,7 @@ import {
   getRounds,
   getAcceptedFixtures,
 } from "@/lib/data";
+import { getPostponedByRound } from "@/lib/admin-data";
 
 const SCHED_HOURS = [17, 18, 19, 20, 21, 22];
 const SCHED_COURTS = [1, 2, 3, 4, 5, 6];
@@ -34,12 +35,13 @@ export default async function LeagueDetail({ params }: { params: Promise<Params>
   const { clubId, leagueId } = await params;
   const cId = Number(clubId);
   const lId = Number(leagueId);
-  const [league, club, groups, rounds, fixtures] = await Promise.all([
+  const [league, club, groups, rounds, fixtures, postponed] = await Promise.all([
     getLeague(cId, lId),
     getClub(cId),
     getGroups(cId, lId),
     getRounds(cId, lId),
     getAcceptedFixtures(cId, lId),
+    getPostponedByRound(cId, lId),
   ]);
   if (!league || !club) notFound();
 
@@ -178,6 +180,12 @@ export default async function LeagueDetail({ params }: { params: Promise<Params>
                         </tbody>
                       </table>
                     </div>
+                    {(postponed.get(r.id)?.length ?? 0) > 0 && (
+                      <p className="mt-2 text-sm text-muted">
+                        <span className="font-semibold text-amber-700">Odloženo:</span>{" "}
+                        {postponed.get(r.id)!.join(", ")}
+                      </p>
+                    )}
                   </div>
                 );
               })}
