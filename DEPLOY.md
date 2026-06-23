@@ -48,6 +48,8 @@ Redom, idempotentno:
 1. [`supabase/schema.sql`](./supabase/schema.sql) — tabele + RLS (javno čitanje)
 2. [`supabase/02_players_extra.sql`](./supabase/02_players_extra.sql) — kontakt/pol/slika igrača, storage bucket, revoke email/phone od anon
 3. [`supabase/03_matches.sql`](./supabase/03_matches.sql) — tabela mečeva + RPC `record_match` / `delete_match`
+4. [`supabase/04_scheduling.sql`](./supabase/04_scheduling.sql) — raspored: `fixtures`, `team_unavailability`, `match_cancellations`, `team_double_requests`, `captains` (+ RLS: javno se vidi samo `status='accepted'` fixtures)
+5. [`supabase/05_scheduling_extra.sql`](./supabase/05_scheduling_extra.sql) — `team_preference` (željeni sat) + `rounds.extra` (vanredno kolo)
 
 Seed postojećih podataka (jednokratno): `node --env-file=.env.local scripts/seed-supabase.mjs`.
 
@@ -71,7 +73,17 @@ npm run deploy     # build:cf + wrangler deploy
 - `/admin/rezultati` — unos rezultata (liga → grupa → ekipe → setovi/predaja). Bodovi i
   tabela se ažuriraju automatski preko RPC-a. Bodovanje: pobeda 2, poraz 1; predaja 6:0 6:0
   (pobednik 2, predao 0, bez gem/set količnika). Mečevi se mogu poništiti (vraća tabelu).
+- `/admin/raspored` — predlog kola za **aktivne** lige: brza tabela (može da igra / termin / dva meča),
+  „Generiši predlog" → mreža teren×sat (teren 2 = najjači, dupli termini uzastopno) → Prihvati/Odbij.
+- `/admin/lige` — kreiranje lige (auto kola po danu u nedelji u opsegu datuma) i dodavanje kola/vanrednog kola.
+- `/admin/kapiteni` — kreiranje kapitena (aktivna liga + ekipa) i kopiranje magic-linka.
 - `/admin/igraci` — izmena/dodavanje igrača (kontakt, pol, fotografija).
+
+## Kapiten panel (magic-link)
+
+Kapiten dobije link `…/kapiten/<token>` (admin ga kopira iz `/admin/kapiteni`; email automatika kasnije).
+Otvaranjem linka se postavlja cookie i otvara `/kapiten`, gde kapiten po kolu bira: Možemo / Termin /
+Dva meča / Otkaži — uz limite (max 3 nedostupnosti, max 5 otkazivanja, najkasnije 3 dana pre kola).
 
 ## Osvežavanje sa starog API-ja (opciono, jednokratni snapshot)
 
