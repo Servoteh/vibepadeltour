@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createCaptain, deleteCaptain, type ActionState } from "@/app/admin/actions";
 
@@ -8,7 +9,14 @@ const field =
 
 type LeagueOpt = { key: string; name: string };
 type TeamOpt = { value: string; label: string };
-type CaptainRow = { id: number; teamName: string; leagueName: string; email: string; link: string };
+type CaptainRow = {
+  id: number;
+  teamName: string;
+  leagueName: string;
+  email: string;
+  link: string;
+  profileHref: string;
+};
 
 export function CaptainsAdmin({
   leagues,
@@ -89,6 +97,12 @@ export function CaptainsAdmin({
                   onFocus={(e) => e.currentTarget.select()}
                   className="min-w-0 flex-1 rounded-lg border border-navy/15 bg-cream-2 px-2 py-1 text-xs text-navy"
                 />
+                <Link
+                  href={c.profileHref}
+                  className="rounded-full border border-navy/15 px-3 py-1.5 text-xs font-medium text-navy hover:bg-navy/5"
+                >
+                  Profil
+                </Link>
                 <form action={deleteCaptain}>
                   <input type="hidden" name="id" value={c.id} />
                   <button className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">

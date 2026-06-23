@@ -308,3 +308,110 @@ export async function getStats() {
     clubs: clubs.count ?? 0,
   };
 }
+
+// ——— Raspored (javno se vidi samo prihvaćen — RLS status='accepted') ———
+export type AcceptedFixture = {
+  groupId: number;
+  roundId: number;
+  team1Id: number;
+  team2Id: number;
+  court: number;
+  hour: number;
+};
+
+export async function getAcceptedFixtures(
+  clubId: number,
+  leagueId: number
+): Promise<AcceptedFixture[]> {
+  const { data, error } = await sb()
+    .from("fixtures")
+    .select("group_id, round_id, team1_id, team2_id, court, hour")
+    .eq("club_id", clubId)
+    .eq("league_id", leagueId)
+    .eq("status", "accepted");
+  if (error) throw new Error(`fixtures: ${error.message}`);
+  return (data ?? []).map((f) => ({
+    groupId: f.group_id as number,
+    roundId: f.round_id as number,
+    team1Id: f.team1_id as number,
+    team2Id: f.team2_id as number,
+    court: f.court as number,
+    hour: f.hour as number,
+  }));
+}
+
+export type UpcomingFixture = {
+  clubId: number;
+  leagueId: number;
+  roundName: string;
+  date: string;
+  hour: number;
+  court: number;
+  team1Name: string;
+  team2Name: string;
+};
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+};
+
+// Najbliži nadolazeći prihvaćeni termini (za naslovnu „sledeće kolo").
+export async function getUpcomingFixtures(limit = 8): Promise<UpcomingFixture[]> {
+  const { data, error } = await sb()
+    .from("fixtures")
+    .select("club_id, league_id, team1_id, team2_id, court, hour, rounds(name, date)")
+    .eq("status", "accepted");
+  if (error) throw new Error(`fixtures: ${error.message}`);
+
+  const today = todayStr();
+  type RoundEmbed = { name?: string; date?: string };
+  type Row = {
+    club_id: number;
+    league_id: number;
+    team1_id: number;
+    team2_id: number;
+    court: number;
+    hour: number;
+    rounds: RoundEmbed | RoundEmbed[] | null;
+  };
+  const rows = (data ?? []) as unknown as Row[];
+
+  const flat = rows
+    .map((r) => {
+      const rd = Array.isArray(r.rounds) ? r.rounds[0] : r.rounds;
+      return {
+        clubId: r.club_id,
+        leagueId: r.league_id,
+        team1Id: r.team1_id,
+        team2Id: r.team2_id,
+        court: r.court,
+        hour: r.hour,
+        roundName: rd?.name ?? "",
+        date: rd?.date ?? "",
+      };
+    })
+    .filter((r) => r.date && r.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.hour - b.hour)
+    .slice(0, limit);
+
+  if (flat.length === 0) return [];
+
+  const ids = [...new Set(flat.flatMap((r) => [r.team1Id, r.team2Id]))];
+  const { data: stData } = await sb().from("standings").select("team_id, team_name").in("team_id", ids);
+  const nameById = new Map<number, string>();
+  for (const s of stData ?? []) nameById.set(s.team_id as number, clean(s.team_name as string));
+
+  return flat.map((r) => ({
+    clubId: r.clubId,
+    leagueId: r.leagueId,
+    roundName: r.roundName,
+    date: r.date,
+    hour: r.hour,
+    court: r.court,
+    team1Name: nameById.get(r.team1Id) || `Tim ${r.team1Id}`,
+    team2Name: nameById.get(r.team2Id) || `Tim ${r.team2Id}`,
+  }));
+}

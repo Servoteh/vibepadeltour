@@ -42,6 +42,7 @@ export default async function KapiteniPage() {
     leagueName: leagueName.get(`${c.club_id}:${c.league_id}`) ?? "",
     email: (c.email as string) ?? "",
     link: `${base}/kapiten/${c.token as string}`,
+    profileHref: `/admin/profil/${c.team_id}?league=${c.club_id}:${c.league_id}`,
   }));
 
   return (

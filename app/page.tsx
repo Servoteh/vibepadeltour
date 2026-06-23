@@ -11,17 +11,19 @@ import {
   getLeaguesForClub,
   getGroups,
   getStandings,
+  getUpcomingFixtures,
 } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 
 export default async function Home() {
-  const [stats, ranking, clubs, bpkLeagues] = await Promise.all([
+  const [stats, ranking, clubs, bpkLeagues, upcoming] = await Promise.all([
     getStats(),
     getRanking(),
     getClubs(),
     getLeaguesForClub(1),
+    getUpcomingFixtures(8),
   ]);
   const topRanking = ranking.slice(0, 10);
 
@@ -86,6 +88,33 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* SLEDEĆE KOLO */}
+      {upcoming.length > 0 && (
+        <section className="mx-auto max-w-7xl px-5 pt-16 sm:px-8">
+          <SectionHeading eyebrow="Raspored" title="Sledeće kolo" />
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {upcoming.map((f, i) => (
+              <Link
+                key={i}
+                href={`/lige/${f.clubId}/${f.leagueId}`}
+                className="rounded-2xl border border-navy/8 bg-paper p-4 shadow-[var(--shadow-soft)] transition hover:border-gold/40"
+              >
+                <div className="flex items-center justify-between text-xs text-muted">
+                  <span>{f.date}</span>
+                  <span className="font-semibold text-gold-deep">
+                    {f.hour}:00 · T{f.court}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-navy">{f.team1Name}</div>
+                <div className="text-xs text-muted">vs</div>
+                <div className="text-sm font-semibold text-navy">{f.team2Name}</div>
+                <div className="mt-2 text-xs text-muted">{f.roundName}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* LIGE */}
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8">

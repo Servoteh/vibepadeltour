@@ -257,3 +257,81 @@ export async function getLeagueScheduleData(
 export function teamNameKey(groupId: number, teamId: number): number {
   return groupId * 100000 + teamId;
 }
+
+// ——————————————————— Moj profil ———————————————————
+
+export type TeamProfile = {
+  teamName: string;
+  stats: { played: number; won: number; points: number; winPct: number; gamesDiff: number; setsDiff: number };
+  matches: { id: number; opponent: string; score: string; result: "W" | "L" }[];
+  history: { kind: string; round: string; detail: string }[];
+};
+
+export async function getTeamProfile(
+  clubId: number,
+  leagueId: number,
+  teamId: number
+): Promise<TeamProfile> {
+  const sb = supabaseAdmin();
+  const [stRow, leagueSt, rds, ms, un, ca, db, pr] = await Promise.all([
+    sb.from("standings").select("*").eq("club_id", clubId).eq("league_id", leagueId).eq("team_id", teamId).maybeSingle(),
+    sb.from("standings").select("team_id, team_name").eq("club_id", clubId).eq("league_id", leagueId),
+    sb.from("rounds").select("id, name").eq("club_id", clubId).eq("league_id", leagueId),
+    sb.from("matches").select("*").eq("club_id", clubId).eq("league_id", leagueId).or(`team1_id.eq.${teamId},team2_id.eq.${teamId}`),
+    sb.from("team_unavailability").select("round_id, hour").eq("team_id", teamId),
+    sb.from("match_cancellations").select("round_id").eq("team_id", teamId),
+    sb.from("team_double_requests").select("round_id").eq("team_id", teamId),
+    sb.from("team_preference").select("round_id, hour").eq("team_id", teamId),
+  ]);
+
+  const nameById = new Map<number, string>();
+  for (const s of leagueSt.data ?? []) nameById.set(s.team_id as number, clean(s.team_name as string));
+  const roundName = new Map<number, string>();
+  for (const r of rds.data ?? []) roundName.set(r.id as number, clean(r.name as string));
+  const rName = (id: number) => roundName.get(id) ?? `Kolo ${id}`;
+
+  const row = stRow.data;
+  const played = (row?.matches_played as number) ?? 0;
+  const won = (row?.matches_won as number) ?? 0;
+
+  const matches = (ms.data ?? []).map((m) => {
+    const oppId = (m.team1_id as number) === teamId ? (m.team2_id as number) : (m.team1_id as number);
+    const sets = (m.sets as [number, number][]) ?? [];
+    const score = m.walkover ? "predaja" : sets.map((s) => `${s[0]}:${s[1]}`).join(" ");
+    return {
+      id: m.id as number,
+      opponent: nameById.get(oppId) || `Tim ${oppId}`,
+      score,
+      result: ((m.winner_team_id as number) === teamId ? "W" : "L") as "W" | "L",
+    };
+  });
+
+  const history: TeamProfile["history"] = [
+    ...(un.data ?? []).map((u) => ({
+      kind: "Nedostupnost",
+      round: rName(u.round_id as number),
+      detail: (u.hour as number) ? `${u.hour}:00` : "ceo termin",
+    })),
+    ...(ca.data ?? []).map((c) => ({ kind: "Otkazano", round: rName(c.round_id as number), detail: "" })),
+    ...(db.data ?? []).map((d) => ({ kind: "Dupli termin", round: rName(d.round_id as number), detail: "" })),
+    ...(pr.data ?? []).map((p) => ({
+      kind: "Željeni termin",
+      round: rName(p.round_id as number),
+      detail: (p.hour as number) ? `${p.hour}:00` : "",
+    })),
+  ];
+
+  return {
+    teamName: clean((row?.team_name as string) ?? "") || `Tim ${teamId}`,
+    stats: {
+      played,
+      won,
+      points: (row?.points as number) ?? 0,
+      winPct: played > 0 ? Math.round((won / played) * 100) : 0,
+      gamesDiff: (row?.games_diff as number) ?? 0,
+      setsDiff: (row?.sets_diff as number) ?? 0,
+    },
+    matches,
+    history,
+  };
+}

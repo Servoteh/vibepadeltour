@@ -8,9 +8,11 @@ import {
   destroyAdminSession,
   requireAdmin,
 } from "@/lib/auth";
+import { headers } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getTeamStrengthMap } from "@/lib/admin-data";
 import { circlePairings, assignSlots, type SchedMatch } from "@/lib/scheduler";
+import { sendMagicLink } from "@/lib/email";
 
 export type ActionState = { error?: string; ok?: boolean; message?: string } | undefined;
 
@@ -604,8 +606,20 @@ export async function createCaptain(_prev: ActionState, formData: FormData): Pro
       { onConflict: "team_id,league_id" }
     );
   if (error) return { error: error.message };
+
+  // Pošalji magic-link emailom (ćuti ako nema RESEND_API_KEY).
+  let emailed = false;
+  if (email) {
+    const h = await headers();
+    const host = h.get("host") ?? "vibepadeltour.com";
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    emailed = await sendMagicLink(email, `${proto}://${host}/kapiten/${token}`, name);
+  }
   revalidatePath("/admin/kapiteni");
-  return { ok: true, message: "Kapiten sačuvan (link generisan)." };
+  return {
+    ok: true,
+    message: emailed ? "Kapiten sačuvan i link poslat na email." : "Kapiten sačuvan (link generisan).",
+  };
 }
 
 export async function deleteCaptain(formData: FormData): Promise<void> {

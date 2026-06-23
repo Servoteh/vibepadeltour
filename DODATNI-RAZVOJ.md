@@ -15,24 +15,24 @@ Legenda: ✅ gotovo · 🔜 sledeće · ⏳ planirano · 💡 ideja
 
 ---
 
-## 🔜 Sledeće (prioritet 1)
+## Prioritet 1 (✅ urađeno 2026-06-23)
 
 ### MOJ PROFIL (za ulogovane)
-- [ ] Stranica `/profil` (kapiten) i sekcija u `/admin`: statistika i istorija.
-- [ ] Statistika: odigrano/pobede/% pobeda, bodovi, rang, kad je igrao a kad ne.
-- [ ] Istorija prijava: šta je i za koje kolo prijavio (može/termin/dva) i šta otkazao.
+- [x] Kapiten vidi „Moj profil" na `/kapiten`; admin pregled na `/admin/profil/[teamId]` (link iz liste kapitena).
+- [x] Statistika: odigrano/pobede/% pobeda/bodovi (`getTeamProfile`).
+- [x] Istorija: odigrani mečevi + prijave (nedostupnost/termin/dupli) i otkazivanja.
 - [ ] (kasnije) igrač-nalozi, ne samo kapiten, da svako vidi svoj profil.
 
 ### Email (Resend)
-- [ ] Resend API ključ kao Worker secret; util `lib/email.ts`.
-- [ ] Automatsko slanje magic-linka kapitenu pri kreiranju.
-- [ ] Podsetnik pred kolo (datum/termin) i obaveštenje kad admin prihvati raspored.
-- [ ] Email šablon (brend: crno/zlatno).
+- [x] Util `lib/email.ts` (Resend HTTP API; ćuti bez `RESEND_API_KEY`) + brendiran šablon.
+- [x] Automatsko slanje magic-linka kapitenu pri kreiranju (ako ima email + ključ).
+- [ ] **Dodati `RESEND_API_KEY` (+ `EMAIL_FROM`) kao Worker secret** da slanje proradi.
+- [ ] Podsetnik pred kolo (`sendReminder` postoji; treba okidač/cron) i obaveštenje pri prihvatanju rasporeda.
 
 ### Javni prikaz rasporeda
-- [ ] Na `/lige/[clubId]/[leagueId]` prikaži **prihvaćen** raspored po kolima (mreža teren×sat).
-- [ ] Na naslovnoj/„sledeće kolo" sekcija sa najbližim terminima.
-- [ ] Po želji javna `/raspored` strana.
+- [x] Na `/lige/[clubId]/[leagueId]` prikazan **prihvaćen** raspored po kolima (mreža teren×sat).
+- [x] Naslovna „Sledeće kolo" — najbliži termini (`getUpcomingFixtures`).
+- [ ] Po želji zasebna javna `/raspored` strana.
 
 ---
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { currentCaptain } from "@/lib/captain-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getTeamProfile } from "@/lib/admin-data";
+import { TeamProfile } from "@/components/TeamProfile";
 import { CaptainPanel, type CaptainRoundRow } from "./CaptainPanel";
 import { captainLogout } from "./actions";
 
@@ -68,6 +70,8 @@ export default async function KapitenPage({
     cancel: caSet.has(r.id as number),
   }));
 
+  const profile = await getTeamProfile(cap.clubId, cap.leagueId, cap.teamId);
+
   return (
     <section className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -85,8 +89,18 @@ export default async function KapitenPage({
         Označi kad <b>možete</b> da igrate, željeni termin, dupli meč ili otkaži kolo. Limiti: nedostupnost
         max 3 kola, otkazivanje max 5 i najkasnije 3 dana unapred.
       </p>
-      <div className="mt-6">
-        <CaptainPanel groupId={groupId} rounds={rows} />
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-bold text-navy">Moj profil</h2>
+        <div className="mt-4">
+          <TeamProfile profile={profile} />
+        </div>
+      </div>
+
+      <div className="mt-10">
+        <h2 className="font-display text-lg font-bold text-navy">Prijava termina</h2>
+        <div className="mt-4">
+          <CaptainPanel groupId={groupId} rounds={rows} />
+        </div>
       </div>
     </section>
   );
