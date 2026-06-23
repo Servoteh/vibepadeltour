@@ -1,7 +1,7 @@
 // Admin-only čitanje (server-side, service_role — zaobilazi RLS).
 // Nikada se ne sme uvoziti u klijentske komponente.
 import { supabaseAdmin } from "./supabase";
-import { clean } from "./data";
+import { clean, getTeams, getRanking } from "./data";
 import type { Player } from "./types";
 
 // Pun zapis igrača UKLJUČUJUĆI email/phone (anon ih ne sme čitati — vidi 02_players_extra.sql).
@@ -106,4 +106,143 @@ export async function getRecentMatches(limit = 25): Promise<MatchRow[]> {
     playedOn: (m.played_on as string) ?? null,
     note: (m.note as string) ?? "",
   }));
+}
+
+// ——————————————————— Raspored (Faza 3) ———————————————————
+
+export type SchedGroup = { id: number; name: string; teams: GroupTeam[] };
+export type SchedRound = { id: number; name: string; date: string | null };
+export type FixtureRow = {
+  id: number;
+  groupId: number;
+  roundId: number;
+  team1Id: number;
+  team2Id: number;
+  court: number;
+  hour: number;
+  strength: number;
+  status: "proposed" | "accepted";
+};
+export type ConstraintRow = {
+  id: number;
+  groupId: number;
+  teamId: number;
+  roundId: number;
+  hour: number | null;
+  source: string;
+};
+
+export type LeagueScheduleData = {
+  groups: SchedGroup[];
+  rounds: SchedRound[];
+  teamName: Record<number, string>; // "groupId:teamId" -> ime ekipe (kao string ključ)
+  fixtures: FixtureRow[];
+  unavailability: ConstraintRow[];
+  cancellations: Omit<ConstraintRow, "hour">[];
+  doubles: Omit<ConstraintRow, "hour">[];
+};
+
+// teamId -> jačina (zbir bodova oba igrača sa otežane rang liste). Veće = jači tim.
+export async function getTeamStrengthMap(): Promise<Map<number, number>> {
+  const [teams, ranking] = await Promise.all([getTeams(), getRanking()]);
+  const pts = new Map(ranking.map((r) => [r.playerId, r.points]));
+  const strength = new Map<number, number>();
+  for (const t of teams) {
+    strength.set(t.id, (pts.get(t.player1Id) ?? 0) + (pts.get(t.player2Id) ?? 0));
+  }
+  return strength;
+}
+
+export async function getLeagueScheduleData(
+  clubId: number,
+  leagueId: number
+): Promise<LeagueScheduleData> {
+  const sb = supabaseAdmin();
+  const [gr, rd, st] = await Promise.all([
+    sb.from("groups").select("id, name").eq("club_id", clubId).eq("league_id", leagueId).order("name"),
+    sb.from("rounds").select("id, name, date").eq("club_id", clubId).eq("league_id", leagueId).order("date"),
+    sb.from("standings").select("group_id, team_id, team_name").eq("club_id", clubId).eq("league_id", leagueId),
+  ]);
+  if (gr.error) throw new Error(`groups: ${gr.error.message}`);
+  if (rd.error) throw new Error(`rounds: ${rd.error.message}`);
+  if (st.error) throw new Error(`standings: ${st.error.message}`);
+
+  const teamsByGroup: Record<number, GroupTeam[]> = {};
+  const teamName: Record<number, string> = {};
+  for (const s of st.data ?? []) {
+    const gid = s.group_id as number;
+    const tid = s.team_id as number;
+    const nm = clean(s.team_name as string) || `Tim ${tid}`;
+    (teamsByGroup[gid] ??= []).push({ teamId: tid, teamName: nm });
+    teamName[gid * 100000 + tid] = nm; // jednostavan kompozitni ključ
+  }
+
+  const groups: SchedGroup[] = (gr.data ?? []).map((g) => ({
+    id: g.id as number,
+    name: clean(g.name as string),
+    teams: (teamsByGroup[g.id as number] ?? []).sort((a, b) =>
+      a.teamName.localeCompare(b.teamName, "sr")
+    ),
+  }));
+
+  const roundIds = (rd.data ?? []).map((r) => r.id as number);
+  const inRounds = roundIds.length ? roundIds : [-1];
+  const [fx, un, ca, db] = await Promise.all([
+    sb.from("fixtures").select("*").eq("club_id", clubId).eq("league_id", leagueId),
+    sb.from("team_unavailability").select("*").in("round_id", inRounds),
+    sb.from("match_cancellations").select("*").in("round_id", inRounds),
+    sb.from("team_double_requests").select("*").in("round_id", inRounds),
+  ]);
+  if (fx.error) throw new Error(`fixtures: ${fx.error.message}`);
+  if (un.error) throw new Error(`unavailability: ${un.error.message}`);
+  if (ca.error) throw new Error(`cancellations: ${ca.error.message}`);
+  if (db.error) throw new Error(`doubles: ${db.error.message}`);
+
+  return {
+    groups,
+    rounds: (rd.data ?? []).map((r) => ({
+      id: r.id as number,
+      name: clean(r.name as string),
+      date: (r.date as string) ?? null,
+    })),
+    teamName,
+    fixtures: (fx.data ?? []).map((f) => ({
+      id: f.id as number,
+      groupId: f.group_id as number,
+      roundId: f.round_id as number,
+      team1Id: f.team1_id as number,
+      team2Id: f.team2_id as number,
+      court: f.court as number,
+      hour: f.hour as number,
+      strength: Number(f.strength ?? 0),
+      status: f.status as "proposed" | "accepted",
+    })),
+    unavailability: (un.data ?? []).map((u) => ({
+      id: u.id as number,
+      groupId: u.group_id as number,
+      teamId: u.team_id as number,
+      roundId: u.round_id as number,
+      hour: (u.hour as number) ?? null,
+      source: (u.source as string) ?? "admin",
+    })),
+    cancellations: (ca.data ?? []).map((c) => ({
+      id: c.id as number,
+      groupId: c.group_id as number,
+      teamId: c.team_id as number,
+      roundId: c.round_id as number,
+      source: (c.source as string) ?? "admin",
+    })),
+    doubles: (db.data ?? []).map((d) => ({
+      id: d.id as number,
+      groupId: d.group_id as number,
+      teamId: d.team_id as number,
+      roundId: d.round_id as number,
+      source: (d.source as string) ?? "admin",
+    })),
+  };
+}
+
+// Ključ za teamName mapu (mora isto i u akciji/strani).
+export function teamNameKey(groupId: number, teamId: number): number {
+  return groupId * 100000 + teamId;
 }
