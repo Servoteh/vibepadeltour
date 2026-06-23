@@ -56,6 +56,7 @@ export default async function RasporedPage({
   const roundUnavail = (data?.unavailability ?? []).filter((u) => u.roundId === roundId);
   const roundCancel = (data?.cancellations ?? []).filter((c) => c.roundId === roundId);
   const roundDouble = (data?.doubles ?? []).filter((d) => d.roundId === roundId);
+  const roundPref = (data?.preferences ?? []).filter((p) => p.roundId === roundId);
 
   return (
     <div className="space-y-8">
@@ -206,7 +207,7 @@ export default async function RasporedPage({
                 <h2 className="font-display text-lg font-bold text-navy">Ograničenja za {roundName(roundId)}</h2>
                 <Constraints leagueKey={leagueKey} teams={teamOptions} rounds={data.rounds} />
 
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <ConstraintList
                     title="Nedostupne ekipe"
                     table="team_unavailability"
@@ -224,6 +225,14 @@ export default async function RasporedPage({
                     title="Dupli termini"
                     table="team_double_requests"
                     rows={roundDouble.map((d) => ({ id: d.id, label: nameOf(d.groupId, d.teamId) }))}
+                  />
+                  <ConstraintList
+                    title="Željeni termini"
+                    table="team_preference"
+                    rows={roundPref.map((p) => ({
+                      id: p.id,
+                      label: `${nameOf(p.groupId, p.teamId)}${p.hour ? ` · ${p.hour}:00` : ""}`,
+                    }))}
                   />
                 </div>
               </div>

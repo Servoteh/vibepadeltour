@@ -5,6 +5,7 @@ import {
   addUnavailability,
   addCancellation,
   addDouble,
+  addPreference,
   type ActionState,
 } from "@/app/admin/actions";
 import { TeamSelect, type TeamOption } from "./TeamSelect";
@@ -33,6 +34,7 @@ export function Constraints({
   const [unState, unAction] = useActionState<ActionState, FormData>(addUnavailability, undefined);
   const [caState, caAction] = useActionState<ActionState, FormData>(addCancellation, undefined);
   const [dbState, dbAction] = useActionState<ActionState, FormData>(addDouble, undefined);
+  const [prState, prAction] = useActionState<ActionState, FormData>(addPreference, undefined);
 
   const roundOptions = rounds.map((r) => (
     <option key={r.id} value={r.id}>
@@ -42,7 +44,7 @@ export function Constraints({
   ));
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {/* Nedostupnost */}
       <form action={unAction} className="space-y-2 rounded-xl border border-navy/8 bg-paper p-4 shadow-[var(--shadow-soft)]">
         <h4 className="text-sm font-bold text-navy">Nedostupnost <span className="font-normal text-muted">(max 3 kola)</span></h4>
@@ -99,6 +101,31 @@ export function Constraints({
             Dodaj
           </button>
           <Status state={dbState} />
+        </div>
+      </form>
+
+      {/* Željeni termin (kad MOŽE) */}
+      <form action={prAction} className="space-y-2 rounded-xl border border-navy/8 bg-paper p-4 shadow-[var(--shadow-soft)]">
+        <h4 className="text-sm font-bold text-navy">Željeni termin <span className="font-normal text-muted">(kad MOŽE)</span></h4>
+        <input type="hidden" name="league" value={leagueKey} />
+        <TeamSelect teams={teams} className={`${field} w-full`} />
+        <select name="round_id" className={`${field} w-full`} aria-label="Kolo">
+          <option value="">— kolo —</option>
+          {roundOptions}
+        </select>
+        <select name="hour" className={`${field} w-full`} aria-label="Željeni sat" defaultValue="">
+          <option value="">— sat —</option>
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h}:00
+            </option>
+          ))}
+        </select>
+        <div className="flex items-center justify-between gap-2">
+          <button className="rounded-full bg-navy/90 px-4 py-1.5 text-xs font-semibold text-white hover:bg-navy">
+            Dodaj
+          </button>
+          <Status state={prState} />
         </div>
       </form>
     </div>

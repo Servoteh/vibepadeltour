@@ -140,6 +140,7 @@ export type LeagueScheduleData = {
   unavailability: ConstraintRow[];
   cancellations: Omit<ConstraintRow, "hour">[];
   doubles: Omit<ConstraintRow, "hour">[];
+  preferences: ConstraintRow[];
 };
 
 // teamId -> jačina (zbir bodova oba igrača sa otežane rang liste). Veće = jači tim.
@@ -187,16 +188,18 @@ export async function getLeagueScheduleData(
 
   const roundIds = (rd.data ?? []).map((r) => r.id as number);
   const inRounds = roundIds.length ? roundIds : [-1];
-  const [fx, un, ca, db] = await Promise.all([
+  const [fx, un, ca, db, pr] = await Promise.all([
     sb.from("fixtures").select("*").eq("club_id", clubId).eq("league_id", leagueId),
     sb.from("team_unavailability").select("*").in("round_id", inRounds),
     sb.from("match_cancellations").select("*").in("round_id", inRounds),
     sb.from("team_double_requests").select("*").in("round_id", inRounds),
+    sb.from("team_preference").select("*").in("round_id", inRounds),
   ]);
   if (fx.error) throw new Error(`fixtures: ${fx.error.message}`);
   if (un.error) throw new Error(`unavailability: ${un.error.message}`);
   if (ca.error) throw new Error(`cancellations: ${ca.error.message}`);
   if (db.error) throw new Error(`doubles: ${db.error.message}`);
+  if (pr.error) throw new Error(`preferences: ${pr.error.message}`);
 
   return {
     groups,
@@ -238,6 +241,14 @@ export async function getLeagueScheduleData(
       teamId: d.team_id as number,
       roundId: d.round_id as number,
       source: (d.source as string) ?? "admin",
+    })),
+    preferences: (pr.data ?? []).map((p) => ({
+      id: p.id as number,
+      groupId: p.group_id as number,
+      teamId: p.team_id as number,
+      roundId: p.round_id as number,
+      hour: (p.hour as number) ?? null,
+      source: (p.source as string) ?? "admin",
     })),
   };
 }

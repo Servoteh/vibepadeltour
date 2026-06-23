@@ -10,6 +10,7 @@ const NAV = [
   { href: "/admin", label: "Pregled" },
   { href: "/admin/rezultati", label: "Unos rezultata" },
   { href: "/admin/raspored", label: "Raspored" },
+  { href: "/admin/lige", label: "Lige i kola" },
   { href: "/admin/igraci", label: "Igrači" },
 ];
 

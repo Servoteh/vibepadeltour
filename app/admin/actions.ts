@@ -228,11 +228,14 @@ export async function generateProposal(_prev: ActionState, formData: FormData): 
   }
 
   // Ograničenja za ovo kolo.
-  const [unRes, caRes, dbRes] = await Promise.all([
+  const [unRes, caRes, dbRes, prRes] = await Promise.all([
     sb.from("team_unavailability").select("team_id, hour").eq("round_id", roundId),
     sb.from("match_cancellations").select("team_id").eq("round_id", roundId),
     sb.from("team_double_requests").select("team_id, group_id").eq("round_id", roundId),
+    sb.from("team_preference").select("team_id, hour").eq("round_id", roundId),
   ]);
+  const preferredHours = new Map<number, number>();
+  for (const p of prRes.data ?? []) preferredHours.set(p.team_id as number, p.hour as number);
   const unavailable = new Map<number, Set<number>>();
   for (const u of unRes.data ?? []) {
     const t = u.team_id as number;
@@ -274,6 +277,7 @@ export async function generateProposal(_prev: ActionState, formData: FormData): 
   const { assigned, unassigned } = assignSlots(matches, {
     unavailable,
     consecutiveTeams,
+    preferredHours,
     hours: SCHED_HOURS,
   });
 
@@ -343,10 +347,9 @@ export async function clearRoundSchedule(formData: FormData): Promise<void> {
   revalidatePath("/lige", "layout");
 }
 
-// ——— Ograničenja (admin unos; kapiten dolazi u Inkrementu 2) ———
+// ——— Ograničenja (ADMIN unos — bez limita; kapiten sa limitima dolazi u Inkrementu 2) ———
 export async function addUnavailability(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireAdmin();
-  const [clubId, leagueId] = parseLeague(formData);
   const groupId = Number(formData.get("group_id"));
   const teamId = Number(formData.get("team_id"));
   const roundId = Number(formData.get("round_id"));
@@ -354,18 +357,7 @@ export async function addUnavailability(_prev: ActionState, formData: FormData):
   const hour = hourRaw ? Number(hourRaw) : null;
   if (!groupId || !teamId || !roundId) return { error: "Izaberi grupu, ekipu i kolo." };
 
-  const sb = supabaseAdmin();
-  const ids = await leagueRoundIds(clubId, leagueId);
-  const { data: existing } = await sb
-    .from("team_unavailability")
-    .select("round_id")
-    .eq("team_id", teamId)
-    .in("round_id", ids.length ? ids : [-1]);
-  const usedRounds = new Set((existing ?? []).map((e) => e.round_id as number));
-  if (!usedRounds.has(roundId) && usedRounds.size >= MAX_UNAVAIL_ROUNDS)
-    return { error: `Maksimum ${MAX_UNAVAIL_ROUNDS} kola sa nedostupnošću po sezoni.` };
-
-  const { error } = await sb
+  const { error } = await supabaseAdmin()
     .from("team_unavailability")
     .insert({ group_id: groupId, team_id: teamId, round_id: roundId, hour, source: "admin" });
   if (error) return { error: error.message };
@@ -375,35 +367,35 @@ export async function addUnavailability(_prev: ActionState, formData: FormData):
 
 export async function addCancellation(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await requireAdmin();
-  const [clubId, leagueId] = parseLeague(formData);
   const groupId = Number(formData.get("group_id"));
   const teamId = Number(formData.get("team_id"));
   const roundId = Number(formData.get("round_id"));
   if (!groupId || !teamId || !roundId) return { error: "Izaberi grupu, ekipu i kolo." };
 
-  const sb = supabaseAdmin();
-  const { data: round } = await sb.from("rounds").select("date").eq("id", roundId).maybeSingle();
-  const dateStr = round?.date as string | null | undefined;
-  if (dateStr) {
-    const diffDays = (new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    if (diffDays < CANCEL_MIN_DAYS)
-      return { error: `Otkazivanje je moguće najkasnije ${CANCEL_MIN_DAYS} dana pre kola.` };
-  }
-
-  const ids = await leagueRoundIds(clubId, leagueId);
-  const { data: existing } = await sb
-    .from("match_cancellations")
-    .select("round_id")
-    .eq("team_id", teamId)
-    .in("round_id", ids.length ? ids : [-1]);
-  const used = new Set((existing ?? []).map((e) => e.round_id as number));
-  if (!used.has(roundId) && used.size >= MAX_CANCELLATIONS)
-    return { error: `Maksimum ${MAX_CANCELLATIONS} otkazivanja po sezoni.` };
-
-  const { error } = await sb
+  const { error } = await supabaseAdmin()
     .from("match_cancellations")
     .upsert(
       { group_id: groupId, team_id: teamId, round_id: roundId, source: "admin" },
+      { onConflict: "team_id,round_id" }
+    );
+  if (error) return { error: error.message };
+  revalidatePath("/admin/raspored");
+  return { ok: true };
+}
+
+// Željeni termin: sat kada ekipa MOŽE da igra (pozitivna preferencija).
+export async function addPreference(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const groupId = Number(formData.get("group_id"));
+  const teamId = Number(formData.get("team_id"));
+  const roundId = Number(formData.get("round_id"));
+  const hour = Number(formData.get("hour"));
+  if (!groupId || !teamId || !roundId || !hour) return { error: "Izaberi grupu, ekipu, kolo i sat." };
+
+  const { error } = await supabaseAdmin()
+    .from("team_preference")
+    .upsert(
+      { group_id: groupId, team_id: teamId, round_id: roundId, hour, source: "admin" },
       { onConflict: "team_id,round_id" }
     );
   if (error) return { error: error.message };
@@ -428,11 +420,131 @@ export async function addDouble(_prev: ActionState, formData: FormData): Promise
   return { ok: true };
 }
 
+// ——— Kreiranje kola i liga ———
+const DEFAULT_COURTS = [1, 2, 3, 4, 5, 6].map((n) => ({ id: n, name: `Teren ${n}` }));
+const fmtDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export async function createRound(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const [clubId, leagueId] = parseLeague(formData);
+  if (!clubId || !leagueId) return { error: "Izaberi ligu." };
+  const date = String(formData.get("date") ?? "").trim() || null;
+  const extra = formData.get("extra") === "on";
+  let name = String(formData.get("name") ?? "").trim();
+
+  const sb = supabaseAdmin();
+  const { data: maxRow } = await sb
+    .from("rounds")
+    .select("id")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const id = ((maxRow?.id as number) ?? 0) + 1;
+  if (!name) {
+    const { count } = await sb
+      .from("rounds")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", clubId)
+      .eq("league_id", leagueId);
+    name = extra ? "Vanredno kolo" : `Kolo ${(count ?? 0) + 1}`;
+  }
+
+  const { error } = await sb.from("rounds").insert({
+    id,
+    club_id: clubId,
+    league_id: leagueId,
+    name,
+    date,
+    start_hour: 17,
+    end_hour: 23,
+    status: "upcoming",
+    extra,
+    courts: DEFAULT_COURTS,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/admin/raspored");
+  revalidatePath("/admin/lige");
+  return { ok: true, message: `Kreirano: ${name}.` };
+}
+
+// Auto-kreiranje lige: generiše kola za izabran dan u nedelji u opsegu datuma.
+export async function createLeague(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const clubId = Number(formData.get("club_id"));
+  const name = String(formData.get("name") ?? "").trim();
+  const weekday = Number(formData.get("weekday")); // 0=Ned … 6=Sub
+  const startDate = String(formData.get("start_date") ?? "").trim();
+  const endDate = String(formData.get("end_date") ?? "").trim();
+  if (!clubId || !name) return { error: "Izaberi klub i unesi naziv lige." };
+
+  const sb = supabaseAdmin();
+  const { data: maxL } = await sb
+    .from("leagues")
+    .select("id")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const leagueId = ((maxL?.id as number) ?? 0) + 1;
+  const { error: lerr } = await sb
+    .from("leagues")
+    .insert({ id: leagueId, club_id: clubId, name, description: "", rules: "", status: "upcoming" });
+  if (lerr) return { error: lerr.message };
+
+  let createdRounds = 0;
+  if (startDate && endDate && !Number.isNaN(weekday)) {
+    const dates: Date[] = [];
+    const d = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    let guard = 0;
+    while (d <= end && guard++ < 400) {
+      if (d.getDay() === weekday) dates.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    if (dates.length) {
+      const { data: maxR } = await sb
+        .from("rounds")
+        .select("id")
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let rid = (maxR?.id as number) ?? 0;
+      const rows = dates.map((dt, i) => ({
+        id: ++rid,
+        club_id: clubId,
+        league_id: leagueId,
+        name: `Kolo ${i + 1}`,
+        date: fmtDate(dt),
+        start_hour: 17,
+        end_hour: 23,
+        status: "upcoming",
+        extra: false,
+        courts: DEFAULT_COURTS,
+      }));
+      const { error: rerr } = await sb.from("rounds").insert(rows);
+      if (rerr) return { error: rerr.message };
+      createdRounds = rows.length;
+    }
+  }
+
+  revalidatePath("/admin/lige");
+  revalidatePath("/lige", "layout");
+  return {
+    ok: true,
+    message: `Liga „${name}" kreirana${createdRounds ? ` sa ${createdRounds} kola` : ""}.`,
+  };
+}
+
 export async function removeConstraint(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
   const table = String(formData.get("table") ?? "");
-  const allowed = ["team_unavailability", "match_cancellations", "team_double_requests"];
+  const allowed = [
+    "team_unavailability",
+    "match_cancellations",
+    "team_double_requests",
+    "team_preference",
+  ];
   if (!id || !allowed.includes(table)) return;
   const { error } = await supabaseAdmin().from(table).delete().eq("id", id);
   if (error) throw new Error(error.message);

@@ -64,6 +64,8 @@ export type AssignOptions = {
   unavailable?: Map<number, Set<number>>;
   // Ekipe koje igraju 2 meča u kolu → njihova dva meča idu u UZASTOPNE satove.
   consecutiveTeams?: Set<number>;
+  // teamId -> željeni sat (kad MOŽE); scheduler ga probava prvog ako je slobodan.
+  preferredHours?: Map<number, number>;
 };
 
 function blocked(unavail: Map<number, Set<number>> | undefined, teamId: number, hour: number): boolean {
@@ -140,11 +142,15 @@ export function assignSlots(matches: SchedMatch[], opts: AssignOptions = {}): As
   }
 
   // ——— Faza 2: ostali mečevi (najjači prvi, teren 2) ———
+  const preferred = opts.preferredHours;
   const unassigned: SchedMatch[] = [];
   const rest = matches.filter((m) => !handled.has(m)).sort((a, b) => b.strength - a.strength);
   for (const m of rest) {
+    // Željeni sat (ako neka od ekipa ima preferenciju) probaj prvi.
+    const pref = preferred?.get(m.team1Id) ?? preferred?.get(m.team2Id);
+    const hourOrder = pref != null ? [pref, ...hours.filter((h) => h !== pref)] : hours;
     let placed = false;
-    for (const hour of hours) {
+    for (const hour of hourOrder) {
       const court = freeCourt(m, hour);
       if (court != null) {
         occupy(m, court, hour);
